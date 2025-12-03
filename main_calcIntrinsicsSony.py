@@ -12,23 +12,23 @@ import pickle
 
 from utils import importMetadata
 from utils import getDataDirectory
-from utilsChecker import computeAverageIntrinsics
-from utilsChecker import saveCameraParameters
+from utilsCheckerSony import computeAverageIntrinsics
+from utilsCheckerSony import saveCameraParameters
 
 # %% Required user inputs.
-sessionName = 'iPadPro12_9_6thgen_720_60FPS_20221207'
-CheckerBoardParams = {'dimensions':(11,8),'squareSize':60} # gets replaced if metadata present in sessionName folder
+sessionName = 'SonyIntrinsics'
+CheckerBoardParams = {'dimensions':(4,5),'squareSize':35} # gets replaced if metadata present in sessionName folder
 
 #List of trials - intrinsics from each video are averaged
-trials = ['c9a5d629-f66e-437a-b5fe-f5af1ce61591']
+trials = ['Cam6']
 
 loadTrialInfo = False # Load previous trial names and CheckerBoardParams from file
 saveIntrinsicsForDeployment = True
 
 deployedFolderNames = ['Deployed_720_60fps','Deployed'] # both folder names if want to keep the detailed folder
 
-cameraModel = "iPhoneTest"  
-videoType = ".mov" #can be .avi or other file formats
+cameraModel = "SONYRX0-6"  
+videoType = ".mp4" #can be .avi or other file formats
     
 # %% Paths to data folder for local testing.
 dataDir = os.path.join(getDataDirectory(),'Data')
