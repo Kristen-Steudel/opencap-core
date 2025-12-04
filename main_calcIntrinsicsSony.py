@@ -17,17 +17,17 @@ from utilsCheckerSony import saveCameraParameters
 
 # %% Required user inputs.
 sessionName = 'SonyIntrinsics'
-CheckerBoardParams = {'dimensions':(9,12),'squareSize':60} # gets replaced if metadata present in sessionName folder
+CheckerBoardParams = {'dimensions':(8,11),'squareSize':60} # gets replaced if metadata present in sessionName folder
 
 #List of trials - intrinsics from each video are averaged
-trials = ['Cam1','Cam2']
+trials = ['Cam2']
 
 loadTrialInfo = False # Load previous trial names and CheckerBoardParams from file
 saveIntrinsicsForDeployment = True
 
 deployedFolderNames = ['Deployed_720_60fps','Deployed'] # both folder names if want to keep the detailed folder
 
-cameraModel = None #"SONYRX0-6"  #Trying camera model None to see if that creates Trial
+cameraModel = "SONYRX0-1"  #Trying camera model None to see if that creates Trial
 videoType = ".mp4" #can be .avi or other file formats
     
 # %% Paths to data folder for local testing.

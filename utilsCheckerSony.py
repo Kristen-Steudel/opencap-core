@@ -45,7 +45,7 @@ def getVideoLength(filename):
         return float(result.stdout)
 
 # %%
-def video2Images(videoPath, nImages=12, tSingleImage=None, filePrefix='output', skipIfRun=True, outputFolder='default'):
+def video2Images(videoPath, nImages=12, tSingleImage=None, filePrefix='output', skipIfRun=False, outputFolder='default'):
     # Pops images out of a video.
     # If tSingleImage is defined (time, not frame number), only one image will be popped
     if outputFolder == 'default':
@@ -220,7 +220,7 @@ def computeAverageIntrinsics(session_path,trialIDs,CheckerBoardParams,nImages=25
             
         if not os.path.exists(os.path.join(video_dir,'cameraIntrinsics.pickle')):
             
-            # Compute intrinsics from images popped out of intrinsic video.
+            # Compute intrinsics from images popped out of intrinsic video. Step in
             video2Images(video_path,filePrefix=trial_name,nImages=nImages)
             CamParams = calcIntrinsics(os.path.join(session_path,trial_name), CheckerBoardParams=CheckerBoardParams,
                                        filenames=['*.jpg'], 
