@@ -17,17 +17,17 @@ from utilsCheckerSony import saveCameraParameters
 
 # %% Required user inputs.
 sessionName = 'SonyIntrinsics'
-CheckerBoardParams = {'dimensions':(4,5),'squareSize':35} # gets replaced if metadata present in sessionName folder
+CheckerBoardParams = {'dimensions':(9,12),'squareSize':60} # gets replaced if metadata present in sessionName folder
 
 #List of trials - intrinsics from each video are averaged
-trials = ['Cam6']
+trials = ['Cam1','Cam2']
 
 loadTrialInfo = False # Load previous trial names and CheckerBoardParams from file
 saveIntrinsicsForDeployment = True
 
 deployedFolderNames = ['Deployed_720_60fps','Deployed'] # both folder names if want to keep the detailed folder
 
-cameraModel = "SONYRX0-6"  
+cameraModel = None #"SONYRX0-6"  #Trying camera model None to see if that creates Trial
 videoType = ".mp4" #can be .avi or other file formats
     
 # %% Paths to data folder for local testing.
@@ -41,8 +41,8 @@ intrinsicComparisonFile = os.path.join(sessionDir,'intrinsicComparison.pkl')
 # Get checkerboard parameters from metadata.
 metadataPath = os.path.join(sessionDir,'sessionMetadata.yaml')
 
-if os.path.exists(metadataPath):
-    sessionMetadata = importMetadata()
+if os.path.exists(metadataPath): #if file doesn't exist, these parameters don't get replaced
+    sessionMetadata = importMetadata(metadataPath)
     CheckerBoardParams = {
         'dimensions': (sessionMetadata['checkerBoard']['black2BlackCornersWidth_n'],
                         sessionMetadata['checkerBoard']['black2BlackCornersHeight_n']),
