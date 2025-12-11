@@ -23,19 +23,25 @@ def runScaleTool(pathGenericSetupFile, pathGenericModel, subjectMass,
     logging.debug(f"timeRange: {timeRange}")
     logging.debug(f"suffix_model: {suffix_model}")
 
+    # Normalize input paths
+    pathGenericSetupFile = os.path.normpath(pathGenericSetupFile)
+    pathGenericModel = os.path.normpath(pathGenericModel)
+    pathTRCFile = os.path.normpath(pathTRCFile)
+    pathOutputFolder = os.path.normpath(pathOutputFolder)
+    
     dirGenericModel, scaledModelNameA = os.path.split(pathGenericModel)
     
     # Paths.
     if scaledModelName == 'not_specified':
         scaledModelName = scaledModelNameA[:-5] + "_scaled"
-    pathOutputModel = os.path.join(
-        pathOutputFolder, scaledModelName + '.osim')
-    pathOutputMotion = os.path.join(
-        pathOutputFolder, scaledModelName + '.mot')
-    pathOutputSetup =  os.path.join(
-        pathOutputFolder, 'Setup_Scale_' + scaledModelName + '.xml')
-    pathUpdGenericModel = os.path.join(
-        pathOutputFolder, scaledModelNameA[:-5] + "_generic.osim")
+    pathOutputModel = os.path.normpath(os.path.join(
+        pathOutputFolder, scaledModelName + '.osim'))
+    pathOutputMotion = os.path.normpath(os.path.join(
+        pathOutputFolder, scaledModelName + '.mot'))
+    pathOutputSetup = os.path.normpath(os.path.join(
+        pathOutputFolder, 'Setup_Scale_' + scaledModelName + '.xml'))
+    pathUpdGenericModel = os.path.normpath(os.path.join(
+        pathOutputFolder, scaledModelNameA[:-5] + "_generic.osim"))
     
     # Marker set.
     _, setupFileName = os.path.split(pathGenericSetupFile)
@@ -58,7 +64,7 @@ def runScaleTool(pathGenericSetupFile, pathGenericModel, subjectMass,
             markerSetFileName = 'gait2392_markers_augmenter.xml'
     else:
         raise ValueError("Unknown model type: scaling")
-    pathMarkerSet = os.path.join(dirGenericModel, markerSetFileName)
+    pathMarkerSet = os.path.normpath(os.path.join(dirGenericModel, markerSetFileName))
     
     # Add the marker set to the generic model and save that updated model.
     opensim.Logger.setLevelString('error')
@@ -134,11 +140,13 @@ def runScaleTool(pathGenericSetupFile, pathGenericModel, subjectMass,
                       is not applied.'.format(meas.getName()))
     # Run scale tool.                      
     scaleTool.printToXML(pathOutputSetup)            
-    command = 'opensim-cmd -o error' + ' run-tool ' + pathOutputSetup
-    os.system(command)
+    command = 'opensim-cmd -o error' + ' run-tool ' + '"' + pathOutputSetup + '"'
+    returnCode = os.system(command)
+    if returnCode != 0:
+        raise Exception(f"opensim-cmd failed with return code {returnCode}. Check that all input files exist and are readable.")
     
     # Sanity check
-    scaled_model = opensim.Model(pathOutputModel)
+    scaled_model = opensim.Model(os.path.normpath(pathOutputModel))
     bodySet = scaled_model.getBodySet()
     nBodies = bodySet.getSize()
     scale_factors = np.zeros((nBodies, 3))
@@ -225,7 +233,7 @@ def runIKTool(pathGenericSetupFile, pathScaledModel, pathTRCFile,
     IKTool.set_report_marker_locations(False)
     IKTool.set_output_motion_file(pathOutputMotion)
     IKTool.printToXML(pathOutputSetup)
-    command = 'opensim-cmd -o error' + ' run-tool ' + pathOutputSetup
+    command = 'opensim-cmd -o error' + ' run-tool ' + '"' + pathOutputSetup + '"'
     os.system(command)
     
     return pathOutputMotion, pathScaledModelWithoutPatella
@@ -360,7 +368,7 @@ def runIDTool(pathGenericSetupFileID, pathGenericSetupFileEL, pathGRFFile,
     IDTool.setResultsDir(pathOutputFolder)
     IDTool.setOutputGenForceFileName(IKFileName + '.sto')   
     IDTool.printToXML(pathOutputSetupID)   
-    command = 'opensim-cmd -o error' + ' run-tool ' + pathOutputSetupID
+    command = 'opensim-cmd -o error' + ' run-tool ' + '"' + pathOutputSetupID + '"'
     os.system(command)
 
 # %% Might be outdated.
@@ -553,7 +561,7 @@ def runOpenPosePKTool(pathGenericSetupFile, pathModel, pathIKFile, timeRange,
         analysisSet.adoptAndAppend(cObj_iter)
     # Print setup files and run analysis.
     ATool.printToXML(pathOutputSetup) 
-    command = 'opensim-cmd -o error' + ' run-tool ' + pathOutputSetup
+    command = 'opensim-cmd -o error' + ' run-tool ' + '"' + pathOutputSetup + '"'
     os.system(command)
     # Remove velocity and acceleration files.
     for CleanUp in glob.glob(pathOutputFolder + '/*.*'):

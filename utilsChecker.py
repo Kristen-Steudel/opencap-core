@@ -11,6 +11,7 @@ import subprocess
 import urllib.request
 import shutil
 import utilsDataman
+import shlex
 import requests
 import ffmpeg
 import logging
@@ -55,9 +56,9 @@ def video2Images(videoPath, nImages=12, tSingleImage=None, filePrefix='output', 
     # already written out?
     if not os.path.exists(os.path.join(outputFolder, filePrefix + '_0.jpg')) or not skipIfRun: 
         if tSingleImage is not None: # pop single image at time value
-            CMD = ('ffmpeg -loglevel error -skip_frame nokey -y -ss ' + str(tSingleImage) + ' -i ' + videoPath + 
-                   " -qmin 1 -q:v 1 -frames:v 1 -vf select='-eq(pict_type\,I)' " + 
-                   os.path.join(outputFolder,filePrefix + '0.png'))
+            outputPath = os.path.join(outputFolder, filePrefix + '0.png')
+            CMD = ('ffmpeg -loglevel error -skip_frame nokey -y -ss ' + str(tSingleImage) + ' -i "' + videoPath + 
+                   '" -qmin 1 -q:v 1 -frames:v 1 -vf select=\'eq(pict_type\\,I)\' "' + outputPath + '"')
             os.system(CMD)
             outImagePath = os.path.join(outputFolder,filePrefix + '0.png')
            
@@ -65,11 +66,11 @@ def video2Images(videoPath, nImages=12, tSingleImage=None, filePrefix='output', 
             lengthVideo = getVideoLength(videoPath)
             timeImageSamples = np.linspace(1,lengthVideo-1,nImages) # disregard first and last second
             for iFrame,t_image in enumerate(timeImageSamples):
-                CMD = ('ffmpeg -loglevel error -skip_frame nokey -ss ' + str(t_image) + ' -i ' + videoPath + 
-                       " -qmin 1 -q:v 1 -frames:v 1 -vf select='-eq(pict_type\,I)' " + 
-                       os.path.join(outputFolder,filePrefix) + '_' + str(iFrame) + '.jpg')
+                outputPath = os.path.join(outputFolder, filePrefix + '_' + str(iFrame) + '.jpg')
+                CMD = ('ffmpeg -loglevel error -skip_frame nokey -ss ' + str(t_image) + ' -i "' + videoPath + 
+                       '" -qmin 1 -q:v 1 -frames:v 1 -vf select=\'eq(pict_type\\,I)\' "' + outputPath + '"')
                 os.system(CMD)
-                outImagePath = os.path.join(outputFolder,filePrefix) + '0.jpg'
+                outImagePath = os.path.join(outputFolder, filePrefix + '_0.jpg')
                 
     return outImagePath
         
@@ -1439,7 +1440,7 @@ def triangulateMultiviewVideo(CameraParamDict,keypointDict,imageScaleFactor=1,
                 inputRoot,inputExt = os.path.splitext(inputName)
                 
                 # Let's use mp4 since we write for the internet
-                outputFileName = inputRoot + '_syncd_' + camName + ".mp4 "# inputExt
+                outputFileName = inputRoot + '_syncd_' + camName + ".mp4"# inputExt
                 
                 thisStartFrame = startInd + startEndFrames[camName][0]
                 
@@ -1740,8 +1741,8 @@ def popNeutralPoseImages(cameraDirectories, camerasToUse, tSingleImage,
     for iCam,cam in enumerate(cameras2Use):
         cameraDirectories_selectedCams[cam] = cameraDirectories[cam]                
         videoPath = os.path.join(cameraDirectories_selectedCams[cam], 
-                                 'InputMedia', 'neutral', 
-                                 '{}_rotated.avi'.format(trial_id))
+                                 'InputMedia', 'static', 
+                                 '{}_rotated.avi'.format(trial_id)) #Changed neutral to static in this path
         
         imagePath = video2Images(videoPath, tSingleImage=tSingleImage, 
                      filePrefix=(str(cam)+'_'), 
@@ -1764,9 +1765,15 @@ def popNeutralPoseImages(cameraDirectories, camerasToUse, tSingleImage,
             
             videoPath = os.path.join(videoFolder,'neutralVid_' + camName + '.mp4')   
             # Write a video from a single image
-            ffmpegCmd = ('ffmpeg -loglevel error -r 0.01 -loop 1 -i ' + imagePath + 
-                         ' -c:v libx264 -tune stillimage -preset  ultrafast -ss 00:00:00 -t 00:00:1   -c:a aac  -b:a 96k -pix_fmt yuv420p  -shortest ' 
-                         + videoPath + ' -y')
-            os.system(ffmpegCmd)
+            # Quote paths to handle spaces and use shlex.split for safe argument parsing
+            ffmpegCmd = (
+                'ffmpeg -loglevel error -r 0.01 -loop 1 -i ' + '"' + imagePath + '"' +
+                ' -c:v libx264 -tune stillimage -preset ultrafast -ss 00:00:00 -t 00:00:1 '
+                ' -c:a aac -b:a 96k -pix_fmt yuv420p -shortest ' + '"' + videoPath + '"' + ' -y'
+            )
+            try:
+                subprocess.run(shlex.split(ffmpegCmd), check=True)
+            except subprocess.CalledProcessError as e:
+                logging.warning(f"ffmpeg failed creating neutral video for {videoPath}: {e}")
         
     return

@@ -1264,11 +1264,12 @@ def rewriteVideos(inputPath,startFrame,nFrames,frameRate,outputDir=None,
 
     # We need to replace double space to single space for split to work
     # That's a bit hacky but works for now. (TODO)
-    ffmpegCmd = "ffmpeg -loglevel error -y -ss {:.3f} -i {} {} -vframes {:.0f} {} {}".format(
+    ffmpegCmd = 'ffmpeg -loglevel error -y -ss {:.3f} -i "{}" {} -vframes {:.0f} {} "{}"'.format(
                 startTime, inputPath, maintainQualityArg, 
                 nFrames, imageScaleArg, outputFullPath).rstrip().replace("  ", " ")
 
-    subprocess.run(ffmpegCmd.split(" "))
+    import shlex
+    subprocess.run(shlex.split(ffmpegCmd))
     
     return
 

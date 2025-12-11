@@ -66,22 +66,13 @@ from utils import importMetadata
 #   C:/Users/opencap/Documents/LabValidation_withVideos/subject2
 #   C:/Users/opencap/Documents/LabValidation_withVideos/subject3
 #   ...
-dataDir = 'C:/Users/opencap/Documents/LabValidation_withVideos/'
+dataDir = 'G:/My Drive/NMBL/Stanford Football OpenCap Screening/Sony Camera Calibration Videos/Testing December 10/Data/'
 
 # The dataset includes 2 sessions per subject.The first session includes
 # static, sit-to-stand, squat, and drop jump trials. The second session 
 # includes walking trials. The sessions are named <subject_name>_Session0 and 
 # <subject_name>_Session1.
-sessionNames = ['subject2_Session0', 'subject2_Session1',
-                'subject3_Session0', 'subject3_Session1',
-                'subject4_Session0', 'subject4_Session1',
-                'subject5_Session0', 'subject5_Session1', 
-                'subject6_Session0', 'subject6_Session1',
-                'subject7_Session0', 'subject7_Session1', 
-                'subject8_Session0', 'subject8_Session1', 
-                'subject9_Session0', 'subject9_Session1', 
-                'subject10_Session0', 'subject10_Session1', 
-                'subject11_Session0', 'subject11_Session1']
+sessionNames = ['subject1']
 
 # We only support OpenPose on Windows.
 poseDetectors = ['OpenPose']
@@ -106,7 +97,7 @@ augmenter_model = 'v0.2'
 # once as long as the variable overwriteRestructuring is False. To overwrite
 # flip the flag to True.
 overwriteRestructuring = False
-subjects = ['subject' + str(i) for i in range(2,12)]
+subjects = ['subject' + str(i) for i in range(1,2)]
 for subject in subjects:
     pathSubject = os.path.join(dataDir, subject)
     pathVideos = os.path.join(pathSubject, 'VideoData')    
@@ -139,7 +130,7 @@ for subject in subjects:
                 pathTrial = os.path.join(pathCam, trial)
                 if not os.path.isdir(pathTrial):
                     continue
-                pathVideo = os.path.join(pathTrial, trial + '.avi')
+                pathVideo = os.path.join(pathTrial, trial + '.mp4')
                 pathTrialNew = os.path.join(pathInputMediaNew, trial)
                 os.makedirs(pathTrialNew, exist_ok=True)
                 shutil.copy2(pathVideo, pathTrialNew)
@@ -154,8 +145,8 @@ for subject in subjects:
 # Cam3:45deg, and Cam4:70deg where 0deg faces the participant. Depending on the
 # cameraSetup, we load different videos.
 cam2sUse = {'5-cameras': ['Cam0', 'Cam1', 'Cam2', 'Cam3', 'Cam4'], 
-            '3-cameras': ['Cam1', 'Cam2', 'Cam3'], 
-            '2-cameras': ['Cam1', 'Cam3']}
+            '3-cameras': ['Cam1', 'Cam3', 'Cam9'], 
+            '2-cameras': ['Cam4', 'Cam5']}
 
 # # %% Functions for re-processing the data.
 def process_trial(trial_name=None, session_name=None, isDocker=False,
@@ -181,14 +172,14 @@ def process_trial(trial_name=None, session_name=None, isDocker=False,
 # %% Process trials.
 for count, sessionName in enumerate(sessionNames):    
     # Get trial names.
-    pathCam0 = os.path.join(dataDir, 'Data', sessionName, 'Videos', 'Cam0',
+    pathCam0 = os.path.join(dataDir, 'Data', sessionName, 'Videos', 'Cam3',
                             'InputMedia')    
     # Work around to re-order trials and have the extrinsics trial firs, and
     # the static second (if available).
     trials_tmp = os.listdir(pathCam0)
     trials_tmp = [t for t in trials_tmp if
                   os.path.isdir(os.path.join(pathCam0, t))]
-    session_with_static = False
+    session_with_static = True
     for trial in trials_tmp:
         if 'extrinsics' in trial.lower():                    
             extrinsics_idx = trials_tmp.index(trial) 

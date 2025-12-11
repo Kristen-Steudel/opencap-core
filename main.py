@@ -91,7 +91,7 @@ def main(sessionName, trialName, trial_id, cameras_to_use=['all'],
     if 'dataDir' not in locals():
         sessionDir = os.path.join(baseDir, 'Data', sessionName)
     else:
-        sessionDir = os.path.join(dataDir, 'Data', sessionName)
+        sessionDir = os.path.normpath(os.path.join(dataDir, 'Data', sessionName))
     sessionMetadata = importMetadata(os.path.join(sessionDir,
                                                   'sessionMetadata.yaml'))
     
@@ -207,8 +207,11 @@ def main(sessionName, trialName, trial_id, cameras_to_use=['all'],
                 camName = pathCam.split('\\')[-1]
             elif os.name == 'posix': # ubuntu
                 camName = pathCam.split('/')[-1]
-            cameraDirectories[camName] = os.path.join(sessionDir, 'Videos',
-                                                      pathCam)
+            # `pathCam` is already the full path to the camera folder from glob,
+            # so store it directly. Previously the code joined it again with
+            # `sessionDir/ Videos` which produced malformed paths and caused
+            # ffprobe/ffmpeg to fail when probing video files.
+            cameraDirectories[camName] = pathCam
             cameraModels[camName] = sessionMetadata['iphoneModel'][camName]        
         
         # Get cameras' intrinsics and extrinsics.     

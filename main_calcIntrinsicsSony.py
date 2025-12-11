@@ -20,7 +20,7 @@ sessionName = 'SonyIntrinsics'
 CheckerBoardParams = {'dimensions':(8,11),'squareSize':60} # gets replaced if metadata present in sessionName folder
 
 #List of trials - intrinsics from each video are averaged
-trials = ['Cam2']
+trials = ['Cam6']
 
 loadTrialInfo = False # Load previous trial names and CheckerBoardParams from file
 saveIntrinsicsForDeployment = True

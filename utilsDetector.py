@@ -97,7 +97,7 @@ def runOpenPoseVideo(cameraDirectory,fileName,pathOpenPose, trialName,
     # if frameRate > 60.0: # previously downsampled for efficiency
     #     cmd_fr = ' -r 60 '
     #     frameRate = 60.0  
-    CMD = "ffmpeg -loglevel error -y -i {}{}-q 0 {}".format(
+    CMD = 'ffmpeg -loglevel error -y -i "{}" {}-q 0 "{}"'.format(
         videoFullPath, cmd_fr, pathVideoRot)
         
     videoFullPath = pathVideoRot
@@ -230,10 +230,10 @@ def runOpenPoseCMD(pathOpenPose, resolutionPoseDetection, cameraDirectory,
         pathVideoOut = os.path.join(pathOutputVideo,
                                     trialPrefix + 'withKeypoints.avi')
         if not generateVideo:
-            command = ('bin\OpenPoseDemo.exe --video {} --write_json {} --render_threshold 0.5 --display 0 --render_pose 0{}'.format(
+            command = ('bin\\OpenPoseDemo.exe --video "{}" --write_json "{}" --render_threshold 0.5 --display 0 --render_pose 0{}'.format(
                 videoFullPath, pathOutputJsons, cmd_hr))
         else:
-            command = ('bin\OpenPoseDemo.exe --video {} --write_json {} --render_threshold 0.5 --display 0{}--write_video {}'.format(
+            command = ('bin\\OpenPoseDemo.exe --video "{}" --write_json "{}" --render_threshold 0.5 --display 0{}--write_video "{}"'.format(
                 videoFullPath, pathOutputJsons, cmd_hr, pathVideoOut))
 
     if command:
@@ -282,7 +282,7 @@ def runMMposeVideo(
     # if frameRate > 60.0:
     #     cmd_fr = ' -r 60 '
     #     frameRate = 60.0  
-    CMD = "ffmpeg -loglevel error -y -i {}{}-q 0 {}".format(
+    CMD = 'ffmpeg -loglevel error -y -i "{}" {}-q 0 "{}"'.format(
         videoFullPath, cmd_fr, pathVideoRot)
         
     videoFullPath = pathVideoRot
