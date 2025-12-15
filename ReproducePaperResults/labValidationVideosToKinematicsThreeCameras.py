@@ -66,25 +66,25 @@ from utils import importMetadata
 #   C:/Users/opencap/Documents/LabValidation_withVideos/subject2
 #   C:/Users/opencap/Documents/LabValidation_withVideos/subject3
 #   ...
-dataDir = os.path.normpath('G:/My Drive/NMBL/Stanford Football OpenCap Screening/Sony Camera Calibration Videos/Testing December 10/Data/')
+dataDir = os.path.normpath('G:\Shared drives\Stanford Football Prototyping\December_9\Data')
 
 # The dataset includes 2 sessions per subject.The first session includes
 # static, sit-to-stand, squat, and drop jump trials. The second session 
 # includes walking trials. The sessions are named <subject_name>_Session0 and 
 # <subject_name>_Session1.
-sessionNames = ['subject2']
+sessionNames = ['subject1',]
 
 # We only support OpenPose on Windows.
 poseDetectors = ['OpenPose']
 
 # Select the camera configuration you would like to use.
 # cameraSetups = ['2-cameras', '3-cameras', '5-cameras']
-cameraSetups = ['2-cameras']
+cameraSetups = ['3-cameras']
 
 # Select the resolution at which you would like to use OpenPose. More details
 # about the options in Examples/reprocessSessions. In the paper, we compared 
 # 'default' and '1x1008_4scales'.
-resolutionPoseDetection = '1x736_2scales' #'1x1008_4scales'   
+resolutionPoseDetection = 'default' #'1x1008_4scales'   
 
 # Since the prepint release, we updated a new augmenter model. To use the model
 # used for generating the paper results, select v0.1. To use the latest model
@@ -97,10 +97,10 @@ augmenter_model = 'v0.2'
 # once as long as the variable overwriteRestructuring is False. To overwrite
 # flip the flag to True.
 overwriteRestructuring = False
-subjects = ['subject' + str(i) for i in range(2,3)]
+subjects = ['subject' + str(i) for i in range(1,2)]
 for subject in subjects:
     pathSubject = os.path.join(dataDir, subject)
-    pathVideos = os.path.join(pathSubject, 'VideoData')    
+    pathVideos = os.path.join(pathSubject, 'Videos')    
     for session in os.listdir(pathVideos):
         if 'Session' not in session:
             continue
@@ -145,7 +145,7 @@ for subject in subjects:
 # Cam3:45deg, and Cam4:70deg where 0deg faces the participant. Depending on the
 # cameraSetup, we load different videos.
 cam2sUse = {'5-cameras': ['Cam0', 'Cam1', 'Cam2', 'Cam3', 'Cam4'], 
-            '3-cameras': ['Cam1', 'Cam3', 'Cam9'], 
+            '3-cameras': ['Cam4', 'Cam5', 'Cam6'], 
             '2-cameras': ['Cam4', 'Cam5']}
 
 # # %% Functions for re-processing the data.
@@ -208,7 +208,7 @@ for count, sessionName in enumerate(sessionNames):
             # from the first session to the second session.
             if sessionName[-1] == '1':
                 sessionDir = os.path.join(dataDir, sessionName)
-                sessionDir_0 = sessionDir[:-1] + '2'
+                sessionDir_0 = sessionDir[:-1] + '1'
                 camDir_0 = os.path.join(
                     sessionDir_0, 'OpenSimData', 
                     poseDetector + '_' + resolutionPoseDetection, cameraSetup)

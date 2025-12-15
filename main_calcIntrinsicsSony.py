@@ -20,14 +20,14 @@ sessionName = 'SonyIntrinsics'
 CheckerBoardParams = {'dimensions':(8,11),'squareSize':60} # gets replaced if metadata present in sessionName folder
 
 #List of trials - intrinsics from each video are averaged
-trials = ['Cam6']
+trials = ['Cam9']
 
 loadTrialInfo = False # Load previous trial names and CheckerBoardParams from file
 saveIntrinsicsForDeployment = True
 
 deployedFolderNames = ['Deployed_720_60fps','Deployed'] # both folder names if want to keep the detailed folder
 
-cameraModel = "SONYRX0-1"  #Trying camera model None to see if that creates Trial
+cameraModel = "SONYRX0-II-Cam9"  #Trying camera model None to see if that creates Trial
 videoType = ".mp4" #can be .avi or other file formats
     
 # %% Paths to data folder for local testing.

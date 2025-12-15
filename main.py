@@ -91,7 +91,7 @@ def main(sessionName, trialName, trial_id, cameras_to_use=['all'],
     if 'dataDir' not in locals():
         sessionDir = os.path.join(baseDir, 'Data', sessionName)
     else:
-        sessionDir = os.path.normpath(os.path.join(dataDir, 'Data', sessionName))
+        sessionDir = os.path.normpath(os.path.join(dataDir, sessionName))
     sessionMetadata = importMetadata(os.path.join(sessionDir,
                                                   'sessionMetadata.yaml'))
     
