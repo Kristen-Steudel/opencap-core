@@ -6,44 +6,6 @@ OpenCap: labValidationVideosToKinematics.py
 Copyright 2022 Stanford University and the Authors
 
 Author(s): Scott Uhlrich, Antoine Falisse
-
-Licensed under the Apache License, Version 2.0 (the "License"); you may not
-use this file except in compliance with the License. You may obtain a copy
-of the License at http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-
-This script processes videos to estimate kinematics with the data from the 
-"OpenCap: 3D human movement dynamics from smartphone videos" paper. The dataset
-includes 10 subjects, with 2 sessions per subject. The first session includes
-static, sit-to-stand, squat, and drop jump trials. The second session includes
-walking trials.
-
-The dataset is available on SimTK: https://simtk.org/frs/?group_id=2385. Make
-sure you download the dataset with videos: LabValidation_withVideos.
-
-In the paper, we compared 3 camera configurations: 
-    2 cameras at +/- 45deg ('2-cameras'), 
-    3 cameras at +/- 45deg and 0deg ('3-cameras'), and 
-    5 cameras at +/- 45deg, +/- 70deg, and 0deg ('5-cameras'); 
-where 0deg faces the participant. Use the variable cameraSetups below to select
-which camera configuration to use. In the paper, we also compared three 
-algorithms for pose detection: OpenPose at default resolution, OpenPose
-with higher accuracy, and HRNet. HRNet is not supported on Windows, and we
-therefore do not support it here (it is supported on the web application). To
-use OpenPose at default resolution, set the variable resolutionPoseDetection to
-'default'. To use OpenPose with higher accuracy, set the variable 
-resolutionPoseDetection to '1x1008_4scales'. Take a look at 
-Examples/reprocessSessions for more details about OpenPose settings and the
-GPU requirements. Please note that we have updated OpenCap since submitting
-the paper. As part of the updates, we re-trained the deep learning model we
-use to predict anatomical markers from video keypoints, and we updated how
-videos are time synchronized. These changes might have a slight effect
-on the results.
 """
 
 # %% Paths and imports.
@@ -66,20 +28,20 @@ from utils import importMetadata
 #   C:/Users/opencap/Documents/LabValidation_withVideos/subject2
 #   C:/Users/opencap/Documents/LabValidation_withVideos/subject3
 #   ...
-dataDir = os.path.normpath('G:\Shared drives\Stanford Football\January_9')
+dataDir = os.path.normpath('G:\Shared drives\Stanford Football\January_19')
 
 # The dataset includes 2 sessions per subject.The first session includes
 # static, sit-to-stand, squat, and drop jump trials. The second session 
 # includes walking trials. The sessions are named <subject_name>_Session0 and 
 # <subject_name>_Session1.
-sessionNames = ['subject2','subject3','subject4']
+sessionNames = ['subject9'] #,'subject3','subject4', 'subject7','subject8','subject9','subject10','subject17','subject54']
 
 # We only support OpenPose on Windows.
 poseDetectors = ['OpenPose']
 
 # Select the camera configuration you would like to use.
 # cameraSetups = ['2-cameras', '3-cameras', '5-cameras']
-cameraSetups = ['3-cameras']
+cameraSetups = ['2-cameras']
 
 # Select the resolution at which you would like to use OpenPose. More details
 # about the options in Examples/reprocessSessions. In the paper, we compared 
@@ -97,7 +59,7 @@ augmenter_model = 'v0.2'
 # once as long as the variable overwriteRestructuring is False. To overwrite
 # flip the flag to True.
 overwriteRestructuring = False
-subjects = ['subject' + str(i) for i in range(2,5)]
+subjects = ['subject2','subject3','subject4', 'subject7','subject8','subject9','subject10','subject17','subject54']
 for subject in subjects:
     pathSubject = os.path.join(dataDir, subject)
     pathVideos = os.path.join(pathSubject, 'Videos')    
@@ -146,7 +108,7 @@ for subject in subjects:
 # cameraSetup, we load different videos.
 cam2sUse = {'5-cameras': ['Cam0', 'Cam1', 'Cam2', 'Cam3', 'Cam4'], 
             '3-cameras': ['Cam1', 'Cam4', 'Cam7'], 
-            '2-cameras': ['Cam4', 'Cam5']}
+            '2-cameras': ['Cam4', 'Cam7']}
 
 # # %% Functions for re-processing the data.
 def process_trial(trial_name=None, session_name=None, isDocker=False,
@@ -172,29 +134,18 @@ def process_trial(trial_name=None, session_name=None, isDocker=False,
 # %% Process trials.
 for count, sessionName in enumerate(sessionNames):    
     # Get trial names.
-    pathCam0 = os.path.join(dataDir, sessionName, 'Videos', 'Cam1',
+    pathCam0 = os.path.join(dataDir, sessionName, 'Videos', 'Cam4',
                             'InputMedia')    
     # Work around to re-order trials and have the extrinsics trial firs, and
     # the static second (if available).
     trials_tmp = os.listdir(pathCam0)
     trials_tmp = [t for t in trials_tmp if
                   os.path.isdir(os.path.join(pathCam0, t))]
-    session_with_static = True
     for trial in trials_tmp:
         if 'extrinsics' in trial.lower():                    
-            extrinsics_idx = trials_tmp.index(trial) 
-        if 'static' in trial.lower():                    
-            static_idx = trials_tmp.index(trial) 
-            session_with_static = True            
+            extrinsics_idx = trials_tmp.index(trial)           
     trials = [trials_tmp[extrinsics_idx]]
-    if session_with_static:
-        trials.append(trials_tmp[static_idx])
-        for trial in trials_tmp:
-            if ('static' not in trial.lower() and 
-                'extrinsics' not in trial.lower()):
-                trials.append(trial)
-    else:
-        for trial in trials_tmp:
+    for trial in trials_tmp:
             if 'extrinsics' not in trial.lower():
                 trials.append(trial)
     
@@ -206,22 +157,18 @@ for count, sessionName in enumerate(sessionNames):
             # model. The static trials were collected as part of the first
             # session for each subject (<>_0). We here copy the Model folder
             # from the first session to the second session.
-            if sessionName[-1] == '1':
-                sessionDir = os.path.join(dataDir, sessionName)
-                sessionDir_0 = sessionDir[:-1] + '1'
-                camDir_0 = os.path.join(
-                    sessionDir_0, 'OpenSimData', 
-                    poseDetector + '_' + resolutionPoseDetection, cameraSetup)
-                modelDir_0 = os.path.join(camDir_0, 'Model')
-                camDir_1 = os.path.join(
-                    sessionDir, 'OpenSimData', 
-                    poseDetector + '_' + resolutionPoseDetection, cameraSetup)
-                modelDir_1 = os.path.join(camDir_1, 'Model')
-                os.makedirs(modelDir_1, exist_ok=True)
-                for file in os.listdir(modelDir_0):
-                    pathFile = os.path.join(modelDir_0, file)
-                    pathFileEnd = os.path.join(modelDir_1, file)
-                    shutil.copy2(pathFile, pathFileEnd)
+            #if sessionName[-1] == '1':
+            sessionDir = os.path.join(dataDir, sessionName)
+            #sessionDir_0 = sessionDir[:-1] + '0'
+            camDir_0 = os.path.join(
+                sessionDir, 'OpenSimData', 
+                poseDetector + '_' + resolutionPoseDetection, cameraSetup)
+            modelDir_0 = os.path.join(camDir_0, 'Model')
+            camDir_1 = os.path.join(
+                sessionDir, 'OpenSimData', 
+                poseDetector + '_' + resolutionPoseDetection, cameraSetup)
+            modelDir_1 = os.path.join(camDir_1, 'Model')
+            os.makedirs(modelDir_1, exist_ok=True)
                     
             # Process trial.
             for trial in trials:                
@@ -233,17 +180,11 @@ for count, sessionName in enumerate(sessionNames):
                 else:
                     extrinsicsTrial = False
                 
-                # Detect if static trial with neutral pose to scale model.
-                if 'static' in trial.lower():                    
-                    scaleModel = True
-                else:
-                    scaleModel = False
-                
-                # Session specific intrinsic parameters
-                if 'subject222' in sessionName or 'subject333' in sessionName:
-                    intrinsicsFinalFolder = 'Deployed_720_240fps'
-                else:
-                    intrinsicsFinalFolder = 'Deployed_720_60fps'                    
+                # Modified the code so that scaleModel is always False 
+                scaleModel = False
+
+                intrinsicsFinalFolder = 'Deployed_720_60fps'
+                                    
                     
                 process_trial(trial,
                               session_name=sessionName,

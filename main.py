@@ -51,7 +51,7 @@ def main(sessionName, trialName, trial_id, cameras_to_use=['all'],
     # Pose detection.
     runPoseDetection = True
     # Video Synchronization.
-    runSynchronization = True
+    runSynchronization = True # Changed this from True
     # Triangulation.
     runTriangulation = True
     # Marker augmentation.

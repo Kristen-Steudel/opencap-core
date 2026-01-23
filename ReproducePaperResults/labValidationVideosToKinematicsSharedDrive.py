@@ -66,13 +66,13 @@ from utils import importMetadata
 #   C:/Users/opencap/Documents/LabValidation_withVideos/subject2
 #   C:/Users/opencap/Documents/LabValidation_withVideos/subject3
 #   ...
-dataDir = os.path.normpath('G:\Shared drives\Stanford Football Prototyping\December_12')
+dataDir = os.path.normpath('G:\Shared drives\Stanford Football Prototyping\December_16')
 
 # The dataset includes 2 sessions per subject.The first session includes
 # static, sit-to-stand, squat, and drop jump trials. The second session 
 # includes walking trials. The sessions are named <subject_name>_Session0 and 
 # <subject_name>_Session1.
-sessionNames = ['subject3']
+sessionNames = ['subject1']
 
 # We only support OpenPose on Windows.
 poseDetectors = ['OpenPose']
@@ -84,7 +84,7 @@ cameraSetups = ['3-cameras']
 # Select the resolution at which you would like to use OpenPose. More details
 # about the options in Examples/reprocessSessions. In the paper, we compared 
 # 'default' and '1x1008_4scales'.
-resolutionPoseDetection = 'default' #'1x1008_4scales'   1x736_2scales
+resolutionPoseDetection = '1x1008_4scales' #'1x1008_4scales'   1x736_2scales
 
 # Since the prepint release, we updated a new augmenter model. To use the model
 # used for generating the paper results, select v0.1. To use the latest model
@@ -97,7 +97,7 @@ augmenter_model = 'v0.2'
 # once as long as the variable overwriteRestructuring is False. To overwrite
 # flip the flag to True.
 overwriteRestructuring = False
-subjects = ['subject' + str(i) for i in range(3,4)]
+subjects = ['subject' + str(i) for i in range(1,2)]
 for subject in subjects:
     pathSubject = os.path.join(dataDir, subject)
     pathVideos = os.path.join(pathSubject, 'Videos')    
@@ -145,7 +145,7 @@ for subject in subjects:
 # Cam3:45deg, and Cam4:70deg where 0deg faces the participant. Depending on the
 # cameraSetup, we load different videos.
 cam2sUse = {'5-cameras': ['Cam0', 'Cam1', 'Cam2', 'Cam3', 'Cam4'], 
-            '3-cameras': ['Cam1', 'Cam5', 'Cam6'], 
+            '3-cameras': ['Cam4', 'Cam3', 'Cam7'], 
             '2-cameras': ['Cam4', 'Cam5']}
 
 # # %% Functions for re-processing the data.
@@ -172,7 +172,7 @@ def process_trial(trial_name=None, session_name=None, isDocker=False,
 # %% Process trials.
 for count, sessionName in enumerate(sessionNames):    
     # Get trial names.
-    pathCam0 = os.path.join(dataDir, sessionName, 'Videos', 'Cam1',
+    pathCam0 = os.path.join(dataDir, sessionName, 'Videos', 'Cam3',
                             'InputMedia')    
     # Work around to re-order trials and have the extrinsics trial firs, and
     # the static second (if available).
@@ -240,7 +240,7 @@ for count, sessionName in enumerate(sessionNames):
                     scaleModel = False
                 
                 # Session specific intrinsic parameters, not sure if I need this
-                if 'subject5' in sessionName or 'subject8' in sessionName:
+                if 'subject99' in sessionName or 'subject999' in sessionName:
                     intrinsicsFinalFolder = 'Deployed_720_240fps'
                 else:
                     intrinsicsFinalFolder = 'Deployed_720_60fps'                    
