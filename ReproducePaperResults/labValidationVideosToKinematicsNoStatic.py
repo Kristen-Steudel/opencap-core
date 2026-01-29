@@ -28,13 +28,13 @@ from utils import importMetadata
 #   C:/Users/opencap/Documents/LabValidation_withVideos/subject2
 #   C:/Users/opencap/Documents/LabValidation_withVideos/subject3
 #   ...
-dataDir = os.path.normpath('G:\Shared drives\Stanford Football\January_19')
+dataDir = os.path.normpath('G:\Shared drives\Stanford Football\January_26')
 
 # The dataset includes 2 sessions per subject.The first session includes
 # static, sit-to-stand, squat, and drop jump trials. The second session 
 # includes walking trials. The sessions are named <subject_name>_Session0 and 
 # <subject_name>_Session1.
-subject_numbers = [9]
+subject_numbers = [10]
 sessionNames = [f'subject{num}' for num in subject_numbers] #['subject2']#,'subject4', 'subject7', 'subject8', 'subject9', 'subject10', 'subject11', 'subject13', 'subject14']
 
 # We only support OpenPose on Windows.
@@ -42,7 +42,7 @@ poseDetectors = ['OpenPose']
 
 # Select the camera configuration you would like to use.
 # cameraSetups = ['2-cameras', '3-cameras', '5-cameras']
-cameraSetups = ['2-cameras']
+cameraSetups = ['3-cameras']
 
 # Select the resolution at which you would like to use OpenPose. More details
 # about the options in Examples/reprocessSessions. In the paper, we compared 
