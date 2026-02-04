@@ -73,7 +73,7 @@ dataDir = os.path.normpath('G:\Shared drives\Stanford Football\January_9')
 # static, sit-to-stand, squat, and drop jump trials. The second session 
 # includes walking trials. The sessions are named <subject_name>_Session0 and 
 # <subject_name>_Session1.
-sessionNames = ['subject4','subject5', 'subject7', 'subject8', 'subject9', 'subject10', 'subject11', 'subject13', 'subject14']
+sessionNames = ['subject2']#,'subject5', 'subject7', 'subject8', 'subject9', 'subject10', 'subject11', 'subject13', 'subject14']
 
 # We only support OpenPose on Windows.
 poseDetectors = ['OpenPose']

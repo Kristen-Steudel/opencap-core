@@ -46,29 +46,47 @@ def getVideoLength(filename):
 
 # %%
 def video2Images(videoPath, nImages=12, tSingleImage=None, filePrefix='output', skipIfRun=False, outputFolder='default'):
-    # Pops images out of a video.
-    # If tSingleImage is defined (time, not frame number), only one image will be popped
     if outputFolder == 'default':
         outputFolder = os.path.dirname(videoPath)
     
-    # already written out?
-    if not os.path.exists(os.path.join(outputFolder, filePrefix + '_0.jpg')) or not skipIfRun: 
+    # Check if first image exists to skip if requested
+    first_image_check = os.path.join(outputFolder, f"{filePrefix}_0.jpg")
+    if not os.path.exists(first_image_check) or not skipIfRun: 
+        
         if tSingleImage is not None: # pop single image at time value
-            CMD = ('ffmpeg -loglevel error -skip_frame nokey -y -ss ' + str(tSingleImage) + ' -i ' + videoPath + 
-                   " -qmin 1 -q:v 1 -frames:v 1 -vf select='-eq(pict_type\,I)' " + 
-                   os.path.join(outputFolder,filePrefix + '0.png'))
-            os.system(CMD)
-            outImagePath = os.path.join(outputFolder,filePrefix + '0.png')
+            outImagePath = os.path.join(outputFolder, f"{filePrefix}0.png")
+            
+            # Construct command as a list
+            CMD = [
+                'ffmpeg', '-loglevel', 'error', '-skip_frame', 'nokey', '-y',
+                '-ss', str(tSingleImage),
+                '-i', videoPath,
+                '-qmin', '1', '-q:v', '1', '-frames:v', '1',
+                '-vf', "select='eq(pict_type,I)'",
+                outImagePath
+            ]
+            
+            subprocess.run(CMD)
            
         else: # pop multiple images from video
             lengthVideo = getVideoLength(videoPath)
-            timeImageSamples = np.linspace(1,lengthVideo-1,nImages) # disregard first and last second
-            for iFrame,t_image in enumerate(timeImageSamples):
-                CMD = ('ffmpeg -loglevel error -skip_frame nokey -ss ' + str(t_image) + ' -i ' + videoPath + 
-                       " -qmin 1 -q:v 1 -frames:v 1 -vf select='-eq(pict_type\,I)' " + 
-                       os.path.join(outputFolder,filePrefix) + '_' + str(iFrame) + '.jpg')
-                os.system(CMD)
-                outImagePath = os.path.join(outputFolder,filePrefix) + '0.jpg'
+            timeImageSamples = np.linspace(1, lengthVideo - 1, nImages) 
+            
+            for iFrame, t_image in enumerate(timeImageSamples):
+                outImagePath = os.path.join(outputFolder, f"{filePrefix}_{iFrame}.jpg")
+                
+                CMD = [
+                    'ffmpeg', '-loglevel', 'error', '-skip_frame', 'nokey', '-y',
+                    '-ss', str(t_image),
+                    '-i', videoPath,
+                    '-qmin', '1', '-q:v', '1', '-frames:v', '1',
+                    '-vf', "select='eq(pict_type,I)'",
+                    outImagePath
+                ]
+                
+                subprocess.run(CMD)
+                # Note: outImagePath updates in loop; returning final path below
+                outImagePath = os.path.join(outputFolder, f"{filePrefix}0.jpg")
                 
     return outImagePath
         

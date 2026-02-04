@@ -20,20 +20,20 @@ sessionName = 'SonyIntrinsics'
 CheckerBoardParams = {'dimensions':(8,11),'squareSize':60} # gets replaced if metadata present in sessionName folder
 
 #List of trials - intrinsics from each video are averaged
-trials = ['Cam1']
+trials = ['Cam4b']
 
 loadTrialInfo = False # Load previous trial names and CheckerBoardParams from file
 saveIntrinsicsForDeployment = True
 
 deployedFolderNames = ['Deployed_720_60fps','Deployed'] # both folder names if want to keep the detailed folder
 
-cameraModel = "SONYRX0-II-Cam1-try2"  #Trying camera model None to see if that creates Trial
-videoType = ".mp4" #can be .avi or other file formats
+cameraModel = "SONYRX0-II-Cam4b"  #Trying camera model None to see if that creates Trial
+videoType = ".MP4" #can be .avi or other file formats
     
 # %% Paths to data folder for local testing.
-dataDir = os.path.join(getDataDirectory(),'Data')
-sessionDir = os.path.join(dataDir,'IntrinsicCaptures',sessionName)
-trialFile = os.path.join(sessionDir,'trialInfo.yaml')
+dataDir = os.path.join(r"G:\Shared drives\Stanford Football\February_2\IntrinsicCaptures") #(getDataDirectory(),'Data')
+sessionDir = os.path.join(dataDir)      #os.path.join(dataDir,'IntrinsicCaptures',sessionName)
+trialFile = os.path.join(sessionDir, trials[0],'trialInfo.yaml')
 intrinsicComparisonFile = os.path.join(sessionDir,'intrinsicComparison.pkl')
 
 # %% Get checker parameters and filenames if they exist
