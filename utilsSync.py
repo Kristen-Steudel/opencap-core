@@ -1933,3 +1933,159 @@ def find_longest_confidence_stretch_in_range_with_gaps(confList, confThresh, max
     
     # If no valid stretches found, return None
     return None
+
+# Function for presynchronized videos
+def loadPresynchronizedVideos(CameraDirectories, trialRelativePath, pathPoseDetector,
+                               undistortPoints=False, CamParamDict=None, 
+                               confidenceThreshold=0.3, 
+                               filtFreqs={'gait':12,'default':30},
+                               imageBasedTracker=False, cams2Use=['all'],
+                               poseDetector='OpenPose', trialName=None, bbox_thr=0.8,
+                               resolutionPoseDetection='default'):
+    """
+    Load 2D keypoints from already-synchronized videos without performing synchronization.
+    Assumes all videos have the same number of frames and are temporally aligned.
+    
+    Returns the same structure as synchronizeVideos() so the rest of the pipeline works unchanged.
+    """
+    
+    markerNames = getOpenPoseMarkerNames()
+    
+    # Create list of cameras.
+    if cams2Use[0] == 'all':
+        cameras2Use = list(CameraDirectories.keys())
+    else:
+        cameras2Use = cams2Use
+    cameras2Use_in = copy.deepcopy(cameras2Use)
+
+    # Initialize output lists
+    pointList = []
+    confList = []
+    
+    CameraDirectories_selectedCams = {}
+    CamParamList_selectedCams = []
+    for cam in cameras2Use:
+        CameraDirectories_selectedCams[cam] = CameraDirectories[cam]
+        CamParamList_selectedCams.append(CamParamDict[cam])
+        
+    # Load data from each camera
+    camsToExclude = []
+    for camName in CameraDirectories_selectedCams:
+        cameraDirectory = CameraDirectories_selectedCams[camName]
+        videoFullPath = os.path.normpath(os.path.join(cameraDirectory,
+                                                      trialRelativePath))
+        trialPrefix, _ = os.path.splitext(
+            os.path.basename(trialRelativePath))
+        if poseDetector == 'OpenPose':
+            outputPklFolder = "OutputPkl_" + resolutionPoseDetection
+        elif poseDetector == 'mmpose':
+            outputPklFolder = "OutputPkl_mmpose_" + str(bbox_thr)
+        openposePklDir = os.path.join(outputPklFolder, trialName)
+        pathOutputPkl = os.path.join(cameraDirectory, openposePklDir)
+        ppPklPath = os.path.join(pathOutputPkl, trialPrefix+'_rotated_pp.pkl')
+        
+        # Load keypoints and confidence
+        key2D, confidence = loadPklVideo(
+            ppPklPath, videoFullPath, imageBasedTracker=imageBasedTracker,
+            poseDetector=poseDetector, confidenceThresholdForBB=0.3)
+        
+        # Get frame rate
+        thisVideo = cv2.VideoCapture(videoFullPath.replace('.mov', '_rotated.avi'))
+        frameRate = np.round(thisVideo.get(cv2.CAP_PROP_FPS))        
+        
+        if key2D.shape[1] == 0 and confidence.shape[1] == 0:
+            camsToExclude.append(camName)
+        else:
+            pointList.append(key2D)
+            confList.append(confidence)
+        
+    # Remove cameras with no data
+    idx_camToExclude = []
+    for camToExclude in camsToExclude:
+        cameras2Use.remove(camToExclude)
+        CameraDirectories_selectedCams.pop(camToExclude)
+        idx_camToExclude.append(cameras2Use_in.index(camToExclude))
+        CamParamDict.pop(camToExclude)
+        CameraDirectories.pop(camToExclude)        
+    delete_multiple_element(CamParamList_selectedCams, idx_camToExclude)    
+
+    # Clean and filter keypoints (same as synchronizeVideos but without sync)
+    markerNames = getOpenPoseMarkerNames()
+    mkrDict = {mkr:iMkr for iMkr,mkr in enumerate(markerNames)}
+    
+    # Remove occluded markers
+    footMkrs = {'right':[mkrDict['RBigToe'], mkrDict['RSmallToe'], mkrDict['RHeel'],mkrDict['RAnkle']],
+                'left':[mkrDict['LBigToe'], mkrDict['LSmallToe'], mkrDict['LHeel'],mkrDict['LAnkle']]}
+    armMkrs = {'right':[mkrDict['RElbow'], mkrDict['RWrist']],
+                'left':[mkrDict['LElbow'], mkrDict['LWrist']]}
+    
+    # Remove occluded foot and arm markers
+    keypointList,confidenceList = zip(*[removeOccludedSide(keys,conf,footMkrs,confidenceThreshold,visualize=False) 
+                                       for keys,conf in zip(pointList,confList)])
+    keypointList,confidenceList = zip(*[removeOccludedSide(keys,conf,armMkrs,confidenceThreshold,visualize=False) 
+                                       for keys,conf in zip(keypointList,confidenceList)])
+    
+    # Determine filtering frequency (use default since we can't detect activity without sync)
+    filtFreq = filtFreqs['default']
+    
+    # Filter keypoint data
+    nCams = len(keypointList)
+    keyFiltList = []
+    confFiltList = []
+    nansInOutList = []
+    for (keyRaw,conf) in zip(keypointList,confidenceList):
+        keyRaw_clean, conf_clean, nans_in_out, _ = clean2Dkeypoints(
+            keyRaw, conf, confidenceThreshold, nCams=nCams)
+        keyRaw_clean_filt = filterKeypointsButterworth(
+            keyRaw_clean, filtFreq, frameRate, order=4)
+        keyFiltList.append(keyRaw_clean_filt)
+        confFiltList.append(conf_clean)
+        nansInOutList.append(nans_in_out)
+
+    # Since videos are pre-synchronized, no time shifting needed
+    # All cameras use the same time range (full video length)
+    nFrames = keyFiltList[0].shape[1]
+    
+    # Find minimum frame count across all cameras
+    minFrames = min([key.shape[1] for key in keyFiltList])
+    
+    # Trim all to the same length
+    keypointsSync = []
+    confidenceSync = []
+    startEndFrames = []
+    nansInOutSync = []
+    
+    for iCam, key in enumerate(keyFiltList):
+        confidence = confFiltList[iCam]
+        # Trim to minimum frame count
+        keypointsSync.append(key[:, :minFrames, :])
+        confidenceSync.append(confidence[:, :minFrames])
+        nansInOutSync.append(nansInOutList[iCam])
+        # Start and end frames (0 to minFrames since no sync offset)
+        startEndFrames.append([0, minFrames-1])
+    
+    # Undistort points if requested
+    if undistortPoints:
+        if CamParamList_selectedCams is None:
+            raise Exception('Need to have CamParamList to undistort Images')
+        unpackedPoints = unpackKeypointList(keypointsSync)
+        undistortedPoints = []
+        for points in unpackedPoints:
+            undistortedPoints.append(undistort2Dkeypoints(
+                points, CamParamList_selectedCams, useIntrinsicMatAsP=True))
+        keypointsSync = repackKeypointList(undistortedPoints)
+    
+    # Convert lists to dictionaries (same structure as synchronizeVideos output)
+    pointDir = {}
+    confDir = {}
+    nansInOutDir = {}
+    startEndFramesDir = {}
+    for iCam, camName in enumerate(cameras2Use):
+        pointDir[camName] = keypointsSync[iCam]
+        confDir[camName] = confidenceSync[iCam]
+        nansInOutDir[camName] = nansInOutSync[iCam]
+        startEndFramesDir[camName] = startEndFrames[iCam]
+    
+    logging.info(f"Loaded pre-synchronized videos with {minFrames} frames across {len(cameras2Use)} cameras")
+    
+    return pointDir, confDir, markerNames, frameRate, nansInOutDir, startEndFramesDir, cameras2Use

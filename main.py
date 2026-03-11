@@ -26,7 +26,7 @@ from utilsChecker import triangulateMultiviewVideo
 from utilsChecker import writeTRCfrom3DKeypoints
 from utilsChecker import popNeutralPoseImages
 from utilsChecker import rotateIntrinsics
-from utilsSync import synchronizeVideos
+from utilsSync import loadPresynchronizedVideos, synchronizeVideos
 from utilsDetector  import runPoseDetector
 from utilsAugmenter import augmentTRC
 from utilsOpenSim import runScaleTool, getScaleTimeRange, runIKTool, generateVisualizerJson
@@ -302,14 +302,15 @@ def main(sessionName, trialName, trial_id, cameras_to_use=['all'],
     pathOutputFiles = {}
     if benchmark:
         pathOutputFiles[trialName] = os.path.join(preAugmentationDir,
-                                                  trialName + ".trc")
+                                                  trialName + "NoSync.trc") #Added NoSync to be able to differentiate from the synchronized version in the benchmark folder.
     else:
         pathOutputFiles[trialName] = os.path.join(preAugmentationDir,
-                                                  trial_id + ".trc")
+                                                  trial_id + "NoSync.trc")
     
     # Trial relative path
     trialRelativePath = os.path.join('InputMedia', trialName, trial_id)
-    
+
+
     if runPoseDetection:
         # Get rotation angles from motion capture environment to OpenSim.
         # Space-fixed are lowercase, Body-fixed are uppercase. 
@@ -391,6 +392,7 @@ def main(sessionName, trialName, trial_id, cameras_to_use=['all'],
                 raise Exception(exception, traceback.format_exc())
       
     if runSynchronization:
+
         # Synchronize videos.
         try:
             keypoints2D, confidence, keypointNames, frameRate, nansInOut, startEndFrames, cameras2Use = (
@@ -413,6 +415,27 @@ def main(sessionName, trialName, trial_id, cameras_to_use=['all'],
                     data collection and https://www.opencap.ai/troubleshooting for 
                     potential causes for a failed trial."""
                 raise Exception(exception, traceback.format_exc())
+            
+    else:
+        # Load pre-synchronized data without synchronization.
+        if not extrinsicsTrial:
+            logging.info("Skipping synchronization - assuming videos are already synchronized")
+
+            try:
+                keypoints2D, confidence, keypointNames, frameRate, nansInOut, startEndFrames, cameras2Use = (
+                    loadPresynchronizedVideos(
+                    cameraDirectories, trialRelativePath, poseDetectorDirectory,
+                    undistortPoints=True, CamParamDict=CamParamDict,
+                    filtFreqs=filtFreqs, confidenceThreshold=0.4,
+                    imageBasedTracker=False, cams2Use=camerasToUse_c, 
+                    poseDetector=poseDetector, trialName=trialName,
+                    resolutionPoseDetection=resolutionPoseDetection))
+            except Exception as e:
+                if len(e.args) == 2:
+                    raise Exception(e.args[0], e.args[1])
+                elif len(e.args) == 1:
+                    exception = "Loading pre-synchronized data failed."
+                    raise Exception(exception, traceback.format_exc())
                 
     # Note: this should not be necessary, because we prevent reprocessing the neutral trial
     # with not all cameras, but keeping it in there in case we would want to.
@@ -571,12 +594,15 @@ def main(sessionName, trialName, trial_id, cameras_to_use=['all'],
             popNeutralPoseImages(cameraDirectories, cameras2Use, 
                                  timeRange4Scaling[0], staticImagesFolderDir,
                                  trial_id, writeVideo = True)   
-            pathOutputIK = pathScaledModel[:-5] + '.mot'
+            pathOutputIK = pathScaledModel[:-5] + 'NoSync.mot' #Added NoSync
             pathModelIK = pathScaledModel
         
         # Inverse kinematics.
         if not scaleModel:
-            outputIKDir = os.path.join(openSimDir, 'Kinematics')
+            if runSynchronization:
+                outputIKDir = os.path.join(openSimDir, 'Kinematics')
+            else:
+                outputIKDir = os.path.join(openSimDir, 'Kinematics_NoSync')
             os.makedirs(outputIKDir, exist_ok=True)
             # Check if there is a scaled model.
             pathScaledModel = os.path.join(outputScaledModelDir, 

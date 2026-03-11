@@ -13,6 +13,8 @@ import os
 import sys
 import shutil
 import yaml
+import openpyxl
+import re
 
 repoDir = os.path.abspath(
     os.path.join(os.path.dirname(os.path.abspath(__file__)),'../'))
@@ -28,14 +30,86 @@ from utils import importMetadata
 #   C:/Users/opencap/Documents/LabValidation_withVideos/subject2
 #   C:/Users/opencap/Documents/LabValidation_withVideos/subject3
 #   ...
-dataDir = os.path.normpath('G:\Shared drives\Stanford Football\January_26')
+subject_numbers = [5]
+sessionNames = [f'subject{num}' for num in subject_numbers] #['subject2']#,'subject4', 'subject7', 'subject8', 'subject9', 'subject10', 'subject11', 'subject13', 'subject14']
+
+# %% Excel Progress Tracking Setup
+PROGRESS_EXCEL_FILE = r'G:\Shared drives\Stanford Football\DataProcess.xlsx'
+
+def update_progress_excel(subject_num, column_name, value):
+    """
+    Opens an Excel file, finds the correct cell, updates it, and saves the file.
+    Finds the subject by Player ID in the first column, and updates the specified column.
+    """
+    try:
+        # Load the workbook and select the active sheet
+        workbook = openpyxl.load_workbook(PROGRESS_EXCEL_FILE)
+        sheet = workbook.active
+
+        # Find the target row by looking for the subject_num in the first column (Player ID)
+        target_row = None
+        for row_index in range(1, sheet.max_row + 1):
+            cell_value = sheet.cell(row=row_index, column=1).value
+            # Handle both string and numeric comparisons
+            if cell_value == subject_num or (isinstance(cell_value, (int, float)) and 
+                                             isinstance(subject_num, (int, float)) and 
+                                             int(cell_value) == int(subject_num)):
+                target_row = row_index
+                break
+        
+        if not target_row:
+            print(f"  - EXCEL_UPDATE_WARNING: Subject ID '{subject_num}' not found in the first column of the Excel file.")
+            return False
+
+        # Find the target column by looking for the column_name in the first row
+        target_col = None
+        for col_index in range(1, sheet.max_column + 1):
+            cell_value = sheet.cell(row=1, column=col_index).value
+            if cell_value and str(cell_value).lower() == str(column_name).lower():
+                target_col = col_index
+                break
+
+        if not target_col:
+            print(f"  - EXCEL_UPDATE_WARNING: Column '{column_name}' not found in the header row of the Excel file.")
+            return False
+
+        # Update the cell and save the workbook
+        sheet.cell(row=target_row, column=target_col).value = value
+        workbook.save(PROGRESS_EXCEL_FILE)
+        print(f"  - EXCEL_UPDATE: Marked '{column_name}' as '{value}' for subject {subject_num}.")
+        return True
+
+    except FileNotFoundError:
+        print(f"  - EXCEL_UPDATE_ERROR: The progress file was not found at '{PROGRESS_EXCEL_FILE}'.")
+        return False
+    except Exception as e:
+        print(f"  - EXCEL_UPDATE_ERROR: An error occurred while updating the Excel file: {e}")
+        return False
+    
+def extract_subject_id_from_session(session_name):
+    """
+    Extracts the subject ID number from a session name like 'subject17' -> 17
+    """
+    try:
+        # Remove 'subject' prefix and convert to int
+        if 'subject' in session_name.lower():
+            subject_id_str = session_name.lower().replace('subject', '')
+            return int(subject_id_str)
+        else:
+            # Try to extract number from the string
+            numbers = re.findall(r'\d+', session_name)
+            if numbers:
+                return int(numbers[0])
+    except (ValueError, AttributeError):
+        pass
+    return None
+
+dataDir = os.path.normpath('G:\Shared drives\Stanford Football\March_2')
 
 # The dataset includes 2 sessions per subject.The first session includes
 # static, sit-to-stand, squat, and drop jump trials. The second session 
 # includes walking trials. The sessions are named <subject_name>_Session0 and 
 # <subject_name>_Session1.
-subject_numbers = [2]
-sessionNames = [f'subject{num}' for num in subject_numbers] #['subject2']#,'subject4', 'subject7', 'subject8', 'subject9', 'subject10', 'subject11', 'subject13', 'subject14']
 
 # We only support OpenPose on Windows.
 poseDetectors = ['OpenPose']
@@ -47,7 +121,7 @@ cameraSetups = ['3-cameras']
 # Select the resolution at which you would like to use OpenPose. More details
 # about the options in Examples/reprocessSessions. In the paper, we compared 
 # 'default' and '1x1008_4scales'.
-resolutionPoseDetection = 'default' #'1x1008_4scales'   
+resolutionPoseDetection = 'default'#'default' #'1x1008_4scales'   
 
 # Since the prepint release, we updated a new augmenter model. To use the model
 # used for generating the paper results, select v0.1. To use the latest model
@@ -62,6 +136,7 @@ augmenter_model = 'v0.2'
 overwriteRestructuring = False
 #subjects = ['subject' + str(i) for i in range(2,3)]
 for subject in sessionNames:
+    sessionName = subject
     pathSubject = os.path.join(dataDir, subject)
     pathVideos = os.path.join(pathSubject, 'Videos')    
     for session in os.listdir(pathVideos):
@@ -108,16 +183,16 @@ for subject in sessionNames:
 # Cam3:45deg, and Cam4:70deg where 0deg faces the participant. Depending on the
 # cameraSetup, we load different videos.
 cam2sUse = {'5-cameras': ['Cam0', 'Cam1', 'Cam2', 'Cam3', 'Cam4'], 
-            '3-cameras': ['Cam1', 'Cam4', 'Cam7'], 
+            '3-cameras': ['Cam1b', 'Cam4b', 'Cam7b'], # No b for days before Feb 2
             '2-cameras': ['Cam4', 'Cam7']}
 
 # # %% Functions for re-processing the data.
 def process_trial(trial_name=None, session_name=None, isDocker=False,
-                  cam2Use=['all'],
+                  cam2Use=['all_available'], #changed from 'all'
                   intrinsicsFinalFolder='Deployed', extrinsicsTrial=False,
                   alternateExtrinsics=None, markerDataFolderNameSuffix=None,
                   imageUpsampleFactor=4, poseDetector='OpenPose',
-                  resolutionPoseDetection='default', scaleModel=False,
+                  resolutionPoseDetection='default', scaleModel=False, #changed resolution from default
                   bbox_thr=0.8, augmenter_model='v0.2', benchmark=False,
                   calibrationOptions=None, offset=True, dataDir=None):
 
@@ -128,14 +203,14 @@ def process_trial(trial_name=None, session_name=None, isDocker=False,
           resolutionPoseDetection=resolutionPoseDetection,
           scaleModel=scaleModel, bbox_thr=bbox_thr,
           augmenter_model=augmenter_model, benchmark=benchmark, offset=offset,
-          dataDir=dataDir)
+          dataDir=dataDir, overwriteCamerasToUse=True)
 
     return
 
 # %% Process trials.
 for count, sessionName in enumerate(sessionNames):    
     # Get trial names.
-    pathCam0 = os.path.join(dataDir, sessionName, 'Videos', 'Cam1',
+    pathCam0 = os.path.join(dataDir, sessionName, 'Videos', 'Cam1b', #No b for days before Feb 2
                             'InputMedia')    
     # Work around to re-order trials and have the extrinsics trial firs, and
     # the static second (if available).
@@ -178,6 +253,7 @@ for count, sessionName in enumerate(sessionNames):
                 # Detect if extrinsics trial to compute extrinsic parameters. 
                 if 'extrinsics' in trial.lower():                    
                     extrinsicsTrial = True
+                    cam2Use = ['all_available']  # Use available cameras for extrinsics
                 else:
                     extrinsicsTrial = False
                 
@@ -198,3 +274,6 @@ for count, sessionName in enumerate(sessionNames):
                               scaleModel=scaleModel, 
                               augmenter_model=augmenter_model,
                               dataDir=dataDir)
+
+
+                #update_progress_excel('March_2_Kinematics', '✓', sessionName)

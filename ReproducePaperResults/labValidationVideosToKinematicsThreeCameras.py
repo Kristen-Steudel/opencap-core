@@ -145,7 +145,11 @@ dataDir = os.path.normpath('G:\Shared drives\Stanford Football\January_9')
 # static, sit-to-stand, squat, and drop jump trials. The second session 
 # includes walking trials. The sessions are named <subject_name>_Session0 and 
 # <subject_name>_Session1.
-sessionNames = ['subject11', 'subject13']
+#need suvject 23, 28, 47 still, video synchronization errors
+sessionNames = ['subject5']
+#sessionNames = ['subject49','subject51','subject52','subject53','subject54','subject56','subject57','subject58','subject59','subject60','subject61','subject62','subject63','subject64','subject65','subject66','subject67','subject68']
+
+#sessionNames = ['subject1','subject2','subject3','subject4','subject5', 'subject6', 'subject7', 'subject8', 'subject9', 'subject10','subject11', 'subject13', 'subject14', 'subject16', 'subject17','subject18', 'subject19','subject20','subject22','subject23', 'subject24','subject25','subject26','subject28','subject29','subject30','subject31','subject32','subject33','subject34','subject35','subject36','subject37','subject38','subject39','subject43','subject44','subject45','subject46','subject47','subject49','subject51','subject52','subject53','subject54','subject56','subject57','subject58','subject59','subject60','subject61','subject62','subject63','subject64','subject65','subject66','subject67','subject68']
 # sessionNames = ['subject26','subject28','subject29','subject31','subject32','subject34','subject36','subject38','subject39','subject44','subject45','subject46','subject47','subject49','subject52','subject53','subject57','subject58','subject60','subject62','subject63','subject64','subject65','subject66','subject68']
 
 # We only support OpenPose on Windows.
@@ -158,7 +162,7 @@ cameraSetups = ['3-cameras']
 # Select the resolution at which you would like to use OpenPose. More details
 # about the options in Examples/reprocessSessions. In the paper, we compared 
 # 'default' and '1x1008_4scales'.
-resolutionPoseDetection = 'default' #'1x1008_4scales'   
+resolutionPoseDetection = '1x1008_4scales'#'default' #'1x1008_4scales'   
 
 # Since the prepint release, we updated a new augmenter model. To use the model
 # used for generating the paper results, select v0.1. To use the latest model

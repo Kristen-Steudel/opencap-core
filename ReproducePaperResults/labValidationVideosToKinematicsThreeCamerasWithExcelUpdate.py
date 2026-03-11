@@ -73,7 +73,7 @@ dataDir = os.path.normpath('G:\Shared drives\Stanford Football\January_9')
 # static, sit-to-stand, squat, and drop jump trials. The second session 
 # includes walking trials. The sessions are named <subject_name>_Session0 and 
 # <subject_name>_Session1.
-sessionNames = ['subject2']#,'subject5', 'subject7', 'subject8', 'subject9', 'subject10', 'subject11', 'subject13', 'subject14']
+sessionNames = ['subject12']#,'subject5', 'subject7', 'subject8', 'subject9', 'subject10', 'subject11', 'subject13', 'subject14']
 
 # We only support OpenPose on Windows.
 poseDetectors = ['OpenPose']
@@ -98,7 +98,7 @@ augmenter_model = 'v0.2'
 # once as long as the variable overwriteRestructuring is False. To overwrite
 # flip the flag to True.
 overwriteRestructuring = False
-subjects = ['subject' + str(i) for i in range(43,48)]
+subjects = ['subject' + str(i) for i in range(12,13)]
 for subject in subjects:
     pathSubject = os.path.join(dataDir, subject)
     pathVideos = os.path.join(pathSubject, 'Videos')    
@@ -146,7 +146,7 @@ for subject in subjects:
 # Cam3:45deg, and Cam4:70deg where 0deg faces the participant. Depending on the
 # cameraSetup, we load different videos.
 cam2sUse = {'5-cameras': ['Cam0', 'Cam1', 'Cam2', 'Cam3', 'Cam4'], 
-            '3-cameras': ['Cam1', 'Cam4', 'Cam7'], 
+            '3-cameras': ['Cam1b', 'Cam4b', 'Cam7b'], 
             '2-cameras': ['Cam4', 'Cam5']}
 
 # Path to Excel file
@@ -247,7 +247,7 @@ def process_trial(trial_name=None, session_name=None, isDocker=False,
 # %% Process trials.
 for count, sessionName in enumerate(sessionNames):    
     # Get trial names.
-    pathCam0 = os.path.join(dataDir, sessionName, 'Videos', 'Cam1',
+    pathCam0 = os.path.join(dataDir, sessionName, 'Videos', 'Cam1b',
                             'InputMedia')    
     # Work around to re-order trials and have the extrinsics trial firs, and
     # the static second (if available).
