@@ -476,6 +476,17 @@ def main(sessionName, trialName, trial_id, cameras_to_use=['all'],
                                 keypointNames, frameRate=frameRate, 
                                 rotationAngles=rotationAngles)
     
+
+    # %%% Add in here to use median filter on the TRC file pre marker augmentation
+    from utilsMedian import median_filter_trc_file  # Assuming this function exists in UtilsMedian.py
+    
+    # Apply median filter to the TRC file
+    pathMedianFilteredTRC = pathOutputFiles[trialName].replace('.trc', '_median_filtered.trc')
+    median_filter_trc_file(pathOutputFiles[trialName], pathMedianFilteredTRC, window=7)  # Adjust window as needed
+    
+    # Update pathOutputFiles to use the filtered file for augmentation
+    pathOutputFiles[trialName] = pathMedianFilteredTRC
+    
     # %% Augmentation.
     
     # Get augmenter model.

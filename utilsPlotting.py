@@ -118,3 +118,66 @@ def plot_all_markers_all_coords(markers, filtered_all, time, marker_list,
             coord_idx=coord_idx,
             save_path=f'all_markers_{coord_name}_filtered.png' if save_path else None
         )
+
+def plot_all_markers_all_coords_one(markers, filtered_all, time, marker_list, 
+                                save_path=None):
+    """
+    Plot all markers with x, y, z coordinates on the same subplot.
+    x in red, y in green, z in blue
+    Dotted lines for pre-filtered data, solid lines for post-filtered data.
+    """
+    n_markers = len(marker_list)
+    
+    # Calculate grid dimensions
+    n_cols = 3
+    n_rows = int(np.ceil(n_markers / n_cols))
+    
+    # Create figure with subplots
+    fig, axes = plt.subplots(n_rows, n_cols, figsize=(15, 5 * n_rows))
+    
+    # Flatten axes array for easier indexing
+    if n_markers == 1:
+        axes = np.array([axes])
+    elif n_rows == 1:
+        axes = np.array(axes)
+    else:
+        axes = axes.flatten()
+    
+    # Colors for x, y, z
+    colors = ['red', 'green', 'blue']
+    coord_names = ['X', 'Y', 'Z']
+    
+    # Plot each marker
+    for marker_idx, marker_name in enumerate(marker_list):
+        ax = axes[marker_idx]
+        
+        # Plot each coordinate (x, y, z)
+        for coord_idx in range(3):
+            # Pre-filtered data (dotted line)
+            ax.plot(time, markers[marker_name][:, coord_idx], 
+                   linestyle=':', color=colors[coord_idx], 
+                   alpha=0.6, linewidth=1,
+                   label=f'{coord_names[coord_idx]} (pre-filter)')
+            
+            # Post-filtered data (solid line)
+            ax.plot(time, filtered_all[marker_name][:, coord_idx], 
+                   linestyle='-', color=colors[coord_idx], 
+                   linewidth=2,
+                   label=f'{coord_names[coord_idx]} (filtered)')
+        
+        ax.set_title(f'{marker_name}', fontsize=12, fontweight='bold')
+        ax.set_xlabel('Time (s)')
+        ax.set_ylabel('Position (mm)')
+        ax.legend(loc='best', fontsize=8)
+        ax.grid(True, alpha=0.3)
+    
+    # Hide any unused subplots
+    for idx in range(n_markers, len(axes)):
+        axes[idx].axis('off')
+    
+    plt.tight_layout()
+    
+    if save_path:
+        plt.savefig(save_path, dpi=300, bbox_inches='tight')
+        print(f"Saved plot to {save_path}")
+    

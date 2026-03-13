@@ -19,8 +19,8 @@ def median_window_filter(x, window):
         y       <-  median filtered signal
     """
     if window % 2:
-        window = window - 1
-    win2 = int(window / 2)
+        window = window - 1 # Making the window even for equal points on left and right 
+    win2 = int(window / 2) # Now win2 is always an integer
     n = len(x)
     y = np.array(x, dtype=float)
     
@@ -50,7 +50,9 @@ def median_filter_trajectory(marker_data, window=7, return_outliers=False):
         Median filtered trajectory
     """
     marker_data = np.asarray(marker_data, dtype=float)
-    
+
+    print(marker_data.ndim, marker_data.shape)
+
     if marker_data.ndim != 2 or marker_data.shape[1] != 3:
         raise ValueError(f"Expected shape (n_frames, 3), got {marker_data.shape}")
     
@@ -97,8 +99,31 @@ def median_filter_all_markers(markers_dict, window=7, verbose=False):
     return filtered_markers
 
 
-# Test/demo code
-if __name__ == "__main__":
+import utilsTRC
+
+def median_filter_trc_file(input_trc_path, output_trc_path, window=7):
+    """
+    Apply median filter to all markers in a TRC file and save to a new file.
+    
+    Parameters:
+    -----------
+    input_trc_path : str
+        Path to input TRC file
+    output_trc_path : str
+        Path to output filtered TRC file
+    window : int
+        Window size for median filter
+    """
+    # Load TRC data
+    data = utilsTRC.trc_2_dict(input_trc_path)
+    time = data['time']
+    markers = data['markers']
+    
+    # Apply median filter to all markers
+    filtered_markers = median_filter_all_markers(markers, window=window, verbose=False)
+    
+    # Save filtered data to new TRC file
+    utilsTRC.dict_2_trc(input_trc_path, filtered_markers, time, output_trc_path)
     import matplotlib.pyplot as plt
     
     print("Testing median_window_filter...")
