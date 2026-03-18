@@ -29,12 +29,21 @@ from datetime import datetime
 import argparse
 import numpy as np
 import matplotlib
-# Use Qt backend if available to avoid Tk "idle_draw" error when closing figures (e.g. on undo)
+
+# Import pyplot with a robust fallback when Qt is missing.
+# If a Qt backend is configured but no Qt bindings are installed, we switch to Agg.
 try:
-    matplotlib.use('Qt5Agg')
-except Exception:
-    pass
-import matplotlib.pyplot as plt
+    import matplotlib.pyplot as plt
+except ImportError as e:
+    msg = str(e).lower()
+    if 'qt binding' in msg or 'qt5' in msg:
+        try:
+            matplotlib.use('Agg')
+            import matplotlib.pyplot as plt
+        except Exception:
+            raise
+    else:
+        raise
 
 try:
     from scipy.interpolate import CubicSpline
@@ -108,12 +117,12 @@ QUALITY_CHECK_MARKER_PAIRS = [  # (marker1, marker2) pairs; distance checked aga
     ('LElbow', 'LShoulder'),
     ('RElbow', 'RShoulder'),
 ]
-QUALITY_TOLERANCE_M = 0.050   # max allowed deviation (m) from median pair distance (e.g. 0.050 m = ~2 in)
+QUALITY_TOLERANCE_M = 0.080 # was 0.050  # max allowed deviation (m) from median pair distance (e.g. 0.050 m = ~2 in)
 # Velocity threshold (m/s): flags frames exceeding this speed as likely artifact.
 # Literature: elite kicking foot velocities 5.2–18.3 m/s (Corcoran et al. 2024, doi:10.3390/sports12030074);
 #   max toe velocity ~20 m/s (Barfield et al. 2002, doi:10.52082/jssm.1.3.72).
 # Threshold above max reported values to allow legitimate fast movement while catching artifacts.
-QUALITY_VEL_THRESHOLD_M_S = 20.0
+QUALITY_VEL_THRESHOLD_M_S = 25.0 # Was 20.0
 
 # Sliding median filter: tight window to remove only very short (1-2 frame) artifacts.
 MEDIAN_FILTER_WINDOW_FRAMES = 10 # 10 = 5 each side of center. Uses np.nanmedian (handles NaN).
@@ -269,7 +278,7 @@ def _draw_quality_bad_regions(ax, t_pct, is_bad_vel, is_bad_rigid):
 
 
 # Layout: maximize window, square subplots (set_box_aspect(1)), no per-subplot legends
-CELL_SIZE_IN = 3.5   # subplot size in inches (5 columns × fewer rows)
+CELL_SIZE_IN = 5.0   # subplot size in inches (5 columns × fewer rows) was 3.5
 
 
 def _maximize_figure(fig):
@@ -305,6 +314,63 @@ def _maximize_figure(fig):
     timer.single_shot = True
     timer.add_callback(_do_maximize)
     timer.start()
+
+
+def _try_focus_figure(fig):
+    """Try to focus the TkAgg figure so keypress events reach mpl_connect handlers."""
+    def _do_focus():
+        try:
+            # TkAgg exposes the underlying tk widget
+            if hasattr(fig.canvas, 'get_tk_widget'):
+                w = fig.canvas.get_tk_widget()
+                top = None
+                try:
+                    top = w.winfo_toplevel()
+                except Exception:
+                    top = None
+                # Ensure the app window is raised as well.
+                if top is not None:
+                    try:
+                        top.deiconify()
+                    except Exception:
+                        pass
+                    try:
+                        top.lift()
+                    except Exception:
+                        pass
+                try:
+                    w.focus_set()
+                except Exception:
+                    pass
+                try:
+                    w.focus_force()
+                except Exception:
+                    pass
+        except Exception:
+            pass
+        try:
+            mgr = fig.canvas.manager
+            if mgr is not None and hasattr(mgr, 'window') and mgr.window is not None:
+                win = mgr.window
+                # Some backends expose focus_force/lift
+                for method_name in ('lift', 'focus_force', 'focus'):
+                    if hasattr(win, method_name):
+                        try:
+                            getattr(win, method_name)()
+                        except Exception:
+                            pass
+        except Exception:
+            pass
+
+    # Try immediately, then again shortly after the event loop starts.
+    _do_focus()
+    try:
+        timer = fig.canvas.new_timer(interval=250)
+        timer.single_shot = True
+        timer.add_callback(_do_focus)
+        timer.start()
+    except Exception:
+        pass
 
 
 
@@ -655,6 +721,7 @@ def collect_spline_interactive(marker_names, markers_dict, t_pct, t_start, t_end
     preview_lines = []
     text_boxes = []
     apply_confirm = [False]
+    last_key = [None]  # debug: show last key Matplotlib reports
     figsize_single = (CELL_SIZE_IN * 3, CELL_SIZE_IN)
     fig, axes = plt.subplots(1, 3, figsize=figsize_single, sharex=True, constrained_layout=True)
     label = '/'.join(marker_names) if len(marker_names) > 1 else marker_names[0]
@@ -736,6 +803,8 @@ def collect_spline_interactive(marker_names, markers_dict, t_pct, t_start, t_end
                 preview_lines.append(pl)
 
         status = f'Points: {len(anchor_points)}'
+        if last_key[0] is not None:
+            status += f'  | last key: {last_key[0]}'
         if apply_confirm[0]:
             status += '  >>> Press a again to apply spline'
         status += '\nu=undo | p=toggle preview | a=apply | d=done'
@@ -770,6 +839,7 @@ def collect_spline_interactive(marker_names, markers_dict, t_pct, t_start, t_end
 
     def on_key(event):
         key = (event.key or '').lower()
+        last_key[0] = event.key
         if key == 'u':
             if anchor_points:
                 anchor_points.pop()
@@ -799,7 +869,33 @@ def collect_spline_interactive(marker_names, markers_dict, t_pct, t_start, t_end
 
     fig.canvas.mpl_connect('button_press_event', on_click)
     fig.canvas.mpl_connect('key_press_event', on_key)
+    # TkAgg fallback: bind directly to Tk widget in case mpl's key_press_event isn't delivered.
+    try:
+        if hasattr(fig.canvas, 'get_tk_widget'):
+            _w = fig.canvas.get_tk_widget()
+            if _w is not None:
+                def _tk_on_key(ev):
+                    ch = getattr(ev, 'char', '') or ''
+                    ks = getattr(ev, 'keysym', '') or ''
+                    if not ch:
+                        ch = ks
+                    class _Evt:
+                        pass
+                    e = _Evt()
+                    e.key = (ch or '').lower()
+                    on_key(e)
+                    return 'break'
+                _w.bind('<KeyPress>', _tk_on_key)
+                try:
+                    top = _w.winfo_toplevel()
+                    if top is not None:
+                        top.bind('<KeyPress>', _tk_on_key, add='+')
+                except Exception:
+                    pass
+    except Exception:
+        pass
     _maximize_figure(fig)
+    _try_focus_figure(fig)
     plt.show()
 
     return result[0]
@@ -868,7 +964,33 @@ def show_median_filter_preview(markers_orig, markers_filtered, t_pct, group_labe
     fig.suptitle(f'Median filter (window={window_frames} frames): Original (dashed) vs Filtered (solid)', fontsize=11)
     fig.text(0.5, 0.02, 'a = accept filter | n = reject (keep original)', ha='center', fontsize=10,
              bbox=dict(boxstyle='round', facecolor='lightyellow', alpha=0.9))
+    # TkAgg fallback for shortcuts.
+    try:
+        if hasattr(fig.canvas, 'get_tk_widget'):
+            _w = fig.canvas.get_tk_widget()
+            if _w is not None:
+                def _tk_on_key(ev):
+                    ch = getattr(ev, 'char', '') or ''
+                    ks = getattr(ev, 'keysym', '') or ''
+                    if not ch:
+                        ch = ks
+                    class _Evt:
+                        pass
+                    e = _Evt()
+                    e.key = (ch or '').lower()
+                    on_key(e)
+                    return 'break'
+                _w.bind('<KeyPress>', _tk_on_key)
+                try:
+                    top = _w.winfo_toplevel()
+                    if top is not None:
+                        top.bind('<KeyPress>', _tk_on_key, add='+')
+                except Exception:
+                    pass
+    except Exception:
+        pass
     _maximize_figure(fig)
+    _try_focus_figure(fig)
     plt.show()
     plt.close(fig)
     return result[0] if result[0] is not None else False
@@ -1032,7 +1154,7 @@ def main():
                 print(f"  Median filter applied (window={MEDIAN_FILTER_WINDOW_FRAMES} frames)")
 
         # Create overview figure now (after median filter preview)
-        n_cols = 5
+        n_cols = 3
         n_rows = (n_subplots + n_cols - 1) // n_cols
         figsize = (n_cols * CELL_SIZE_IN, n_rows * CELL_SIZE_IN)
         fig, axes = plt.subplots(n_rows, n_cols, figsize=figsize, constrained_layout=True)
@@ -1044,8 +1166,17 @@ def main():
                 selected[0] = r
                 plt.close(fig)
 
+        # Debug: show last key we receive in the window (helps verify TkAgg key routing).
+        _inst_text = [None]
+
         def on_overview_key(event):
             k = (event.key or '').lower()
+            try:
+                if _inst_text[0] is not None:
+                    _inst_text[0].set_text(f'{_inst} | last key: {event.key!r}')
+                    fig.canvas.draw_idle()
+            except Exception:
+                pass
             if k == 'd':
                 selected[0] = ('DONE', [])
                 plt.close(fig)
@@ -1123,7 +1254,7 @@ def main():
         med_status = ' [MEDIAN]' if median_filter_applied[0] else ''
         fig.suptitle(f'{pid} {tname}{med_status}', fontsize=12)
         _inst = 'Click marker to edit | u/U=undo | d=done | Red=velocity fail | Blue=rigid fail | Purple=both'
-        fig.text(0.5, 0.02, _inst, ha='center', fontsize=10, bbox=dict(boxstyle='round', facecolor='lightyellow', alpha=0.9))
+        _inst_text[0] = fig.text(0.5, 0.02, _inst, ha='center', fontsize=10, bbox=dict(boxstyle='round', facecolor='lightyellow', alpha=0.9))
 
         out_path = os.path.join(out_dir, f'PreAugment_{pid}_{tname}_{timestamp}.png')
         plt.savefig(out_path, dpi=150, bbox_inches='tight')
@@ -1135,7 +1266,34 @@ def main():
 
         fig.canvas.mpl_connect('button_press_event', on_overview_click)
         fig.canvas.mpl_connect('key_press_event', on_overview_key)
+        # TkAgg fallback for shortcuts.
+        try:
+            if hasattr(fig.canvas, 'get_tk_widget'):
+                _w = fig.canvas.get_tk_widget()
+                if _w is not None:
+                    def _tk_on_key(ev):
+                        ch = getattr(ev, 'char', '') or ''
+                        ks = getattr(ev, 'keysym', '') or ''
+                        if not ch:
+                            ch = ks
+                        class _Evt:
+                            pass
+                        e = _Evt()
+                        e.key = (ch or '').lower()
+                        on_overview_key(e)
+                        return 'break'
+
+                    _w.bind('<KeyPress>', _tk_on_key)
+                    try:
+                        top = _w.winfo_toplevel()
+                        if top is not None:
+                            top.bind('<KeyPress>', _tk_on_key, add='+')
+                    except Exception:
+                        pass
+        except Exception:
+            pass
         _maximize_figure(fig)
+        _try_focus_figure(fig)
         plt.show()
         plt.close(fig)
 
@@ -1219,7 +1377,7 @@ def main():
             status = f"Splines: {list(marker_to_splines.keys())}" if marker_to_splines else "None"
             fig.suptitle(f'{pid} {tname} — {status}', fontsize=11)
             _inst2 = 'u=undo last | U=undo all | Click marker | d=done | Red=vel | Blue=rigid | Purple=both'
-            fig.text(0.5, 0.02, _inst2, ha='center', fontsize=10, bbox=dict(boxstyle='round', facecolor='lightyellow', alpha=0.9))
+            _inst2_text = fig.text(0.5, 0.02, _inst2, ha='center', fontsize=10, bbox=dict(boxstyle='round', facecolor='lightyellow', alpha=0.9))
 
             def on_click2(event):
                 r = get_clicked_group(event, axes[:n_subplots], group_labels)
@@ -1230,6 +1388,11 @@ def main():
             def on_key2(event):
                 k = event.key or ''
                 k_lower = k.lower()
+                try:
+                    _inst2_text.set_text(f'{_inst2} | last key: {event.key!r}')
+                    fig.canvas.draw_idle()
+                except Exception:
+                    pass
                 if k_lower == 'd':
                     selected[0] = ('DONE', [])
                     plt.close(fig)
@@ -1250,7 +1413,33 @@ def main():
 
             fig.canvas.mpl_connect('button_press_event', on_click2)
             fig.canvas.mpl_connect('key_press_event', on_key2)
+            # TkAgg fallback for shortcuts.
+            try:
+                if hasattr(fig.canvas, 'get_tk_widget'):
+                    _w = fig.canvas.get_tk_widget()
+                    if _w is not None:
+                        def _tk_on_key(ev):
+                            ch = getattr(ev, 'char', '') or ''
+                            ks = getattr(ev, 'keysym', '') or ''
+                            if not ch:
+                                ch = ks
+                            class _Evt:
+                                pass
+                            e = _Evt()
+                            e.key = (ch or '').lower()
+                            on_key2(e)
+                            return 'break'
+                        _w.bind('<KeyPress>', _tk_on_key)
+                        try:
+                            top = _w.winfo_toplevel()
+                            if top is not None:
+                                top.bind('<KeyPress>', _tk_on_key, add='+')
+                        except Exception:
+                            pass
+            except Exception:
+                pass
             _maximize_figure(fig)
+            _try_focus_figure(fig)
             plt.show()
             plt.close(fig)
 
