@@ -2009,6 +2009,10 @@ def loadPresynchronizedVideos(CameraDirectories, trialRelativePath, pathPoseDete
         CameraDirectories.pop(camToExclude)        
     delete_multiple_element(CamParamList_selectedCams, idx_camToExclude)    
 
+    # Create a web animation for each camera's keypoints for debugging if wanted.
+
+    # Skip synchronize keypoints
+
     # Clean and filter keypoints (same as synchronizeVideos but without sync)
     markerNames = getOpenPoseMarkerNames()
     mkrDict = {mkr:iMkr for iMkr,mkr in enumerate(markerNames)}

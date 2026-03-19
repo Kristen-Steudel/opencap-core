@@ -127,6 +127,12 @@ QUALITY_VEL_THRESHOLD_M_S = 25.0 # Was 20.0
 # Sliding median filter: tight window to remove only very short (1-2 frame) artifacts.
 MEDIAN_FILTER_WINDOW_FRAMES = 10 # 10 = 5 each side of center. Uses np.nanmedian (handles NaN).
 
+# Spline behavior:
+# Clamped boundary conditions (matching estimated endpoint slopes) can cause large
+# oscillations/overshoot ("big sine waves") on noisy or long trajectories.
+# A natural cubic spline is typically smoother for pre-augmentation cleaning.
+SPLINE_USE_CLAMPED_BC = False
+
 
 def check_data_quality(data, marker_names, marker_pairs, pair_names=None, tolerance=QUALITY_TOLERANCE_M, vel_threshold=QUALITY_VEL_THRESHOLD_M_S, data_rate_hz=None):
     """
@@ -279,6 +285,9 @@ def _draw_quality_bad_regions(ax, t_pct, is_bad_vel, is_bad_rigid):
 
 # Layout: maximize window, square subplots (set_box_aspect(1)), no per-subplot legends
 CELL_SIZE_IN = 5.0   # subplot size in inches (5 columns × fewer rows) was 3.5
+# Wider single-marker spline editor figure (longer x-axis for easier blip picking).
+SPLINE_EDITOR_WIDTH_PER_AXIS_IN = 8.0
+SPLINE_EDITOR_HEIGHT_IN = 4.0
 
 
 def _maximize_figure(fig):
@@ -577,8 +586,11 @@ def apply_spline_to_trc(trc, marker_anchors):
 def spline_values_at_t(anchor_points, t_eval, t_pct=None, data_x=None, data_y=None, data_z=None, t_start=None, t_end=None):
     """
     Return (x, y, z) from cubic spline through anchor_points (t_s, x, y, z).
-    Uses clamped boundary conditions: spline derivatives at first/last anchor match
-    the data slope (from np.gradient) so the curve blends smoothly with surrounding data.
+    Uses a natural cubic spline by default for stability/smoothness.
+
+    Optional: if SPLINE_USE_CLAMPED_BC is enabled, spline endpoint derivatives are
+    estimated from surrounding data via np.gradient so the curve blends with
+    local slope.
     """
     if CubicSpline is None or len(anchor_points) < 2:
         return None, None, None
@@ -587,28 +599,35 @@ def spline_values_at_t(anchor_points, t_eval, t_pct=None, data_x=None, data_y=No
     x_anch = np.array([p[1] for p in pts])
     y_anch = np.array([p[2] for p in pts])
     z_anch = np.array([p[3] for p in pts])
-    duration = (t_end - t_start) if (t_start is not None and t_end is not None) else 1.0
+    # Default stable behavior.
     bc_type = 'natural'
-    if t_pct is not None and data_x is not None and len(t_pct) > 1 and duration > 0:
-        t_pct_anch = (t_anch - t_start) / duration * 100
-        scale = 100.0 / duration
-        def get_deriv(data, t_pct_val):
-            grad = np.gradient(data, t_pct)
-            return np.interp(t_pct_val, t_pct, grad) * scale
-        try:
-            d_start_x = get_deriv(data_x, t_pct_anch[0])
-            d_end_x = get_deriv(data_x, t_pct_anch[-1])
-            d_start_y = get_deriv(data_y, t_pct_anch[0])
-            d_end_y = get_deriv(data_y, t_pct_anch[-1])
-            d_start_z = get_deriv(data_z, t_pct_anch[0])
-            d_end_z = get_deriv(data_z, t_pct_anch[-1])
-            bc_type = ((1, (d_start_x, d_start_y, d_start_z)), (1, (d_end_x, d_end_y, d_end_z)))
-        except Exception:
-            bc_type = 'natural'
+
+    # Optional clamped BC mode (off by default).
+    if SPLINE_USE_CLAMPED_BC:
+        duration = (t_end - t_start) if (t_start is not None and t_end is not None) else 1.0
+        if t_pct is not None and data_x is not None and len(t_pct) > 1 and duration > 0:
+            t_pct_anch = (t_anch - t_start) / duration * 100
+            scale = 100.0 / duration
+
+            def get_deriv(data, t_pct_val):
+                grad = np.gradient(data, t_pct)
+                return np.interp(t_pct_val, t_pct, grad) * scale
+
+            try:
+                d_start_x = get_deriv(data_x, t_pct_anch[0])
+                d_end_x = get_deriv(data_x, t_pct_anch[-1])
+                d_start_y = get_deriv(data_y, t_pct_anch[0])
+                d_end_y = get_deriv(data_y, t_pct_anch[-1])
+                d_start_z = get_deriv(data_z, t_pct_anch[0])
+                d_end_z = get_deriv(data_z, t_pct_anch[-1])
+                bc_type = ((1, (d_start_x, d_start_y, d_start_z)), (1, (d_end_x, d_end_y, d_end_z)))
+            except Exception:
+                bc_type = 'natural'
+
     if bc_type == 'natural':
-        cs_x = CubicSpline(t_anch, x_anch)
-        cs_y = CubicSpline(t_anch, y_anch)
-        cs_z = CubicSpline(t_anch, z_anch)
+        cs_x = CubicSpline(t_anch, x_anch, bc_type='natural')
+        cs_y = CubicSpline(t_anch, y_anch, bc_type='natural')
+        cs_z = CubicSpline(t_anch, z_anch, bc_type='natural')
     else:
         d_sx, d_sy, d_sz = bc_type[0][1]
         d_ex, d_ey, d_ez = bc_type[1][1]
@@ -722,7 +741,10 @@ def collect_spline_interactive(marker_names, markers_dict, t_pct, t_start, t_end
     text_boxes = []
     apply_confirm = [False]
     last_key = [None]  # debug: show last key Matplotlib reports
-    figsize_single = (CELL_SIZE_IN * 3, CELL_SIZE_IN)
+    figsize_single = (
+        SPLINE_EDITOR_WIDTH_PER_AXIS_IN * 3,
+        SPLINE_EDITOR_HEIGHT_IN,
+    )
     fig, axes = plt.subplots(1, 3, figsize=figsize_single, sharex=True, constrained_layout=True)
     label = '/'.join(marker_names) if len(marker_names) > 1 else marker_names[0]
     fig.suptitle(label, fontsize=11)
@@ -743,7 +765,6 @@ def collect_spline_interactive(marker_names, markers_dict, t_pct, t_start, t_end
                 ax.plot(t_pct, orig[comp], color=c, linewidth=0.8, linestyle=':', alpha=0.7, label=lbl_orig)
             ax.plot(t_pct, d[comp], color=c, linewidth=1.5, linestyle=ls, label=m if len(marker_names) > 1 else None)
         ax.set_ylabel(f'{lbl} (m)')
-        ax.set_box_aspect(1)
         ax.grid(True, alpha=0.3)
         # REPLA
         #ax.set_xlim(X_MIN_PCT, X_MAX_PCT)
@@ -1017,6 +1038,8 @@ def main():
                         help='Also include TRCs found under a Cleaned/ folder (default: skip).')
     parser.add_argument('--no-review', action='store_true',
                         help='Do not open interactive windows; only save per-trial overview PNGs.')
+    parser.add_argument('--debug-discovery', action='store_true',
+                        help='Print TRC discovery/loading counts to help match trials in your Excel sheet.')
     args, _unknown = parser.parse_known_args()
 
     input_root = args.input_root
@@ -1027,6 +1050,8 @@ def main():
     if not trc_paths:
         print(f"No TRC files found under: {input_root}")
         return
+    if args.debug_discovery:
+        print(f"[debug] Discovered PreAugmentation TRC files: {len(trc_paths)}")
 
     # Discover marker names from all TRCs (union across trials)
     all_marker_names = set()
@@ -1087,10 +1112,17 @@ def main():
         print(f"  Edit log: {csv_path}")
 
     all_trials_flat = []
+    n_loaded = 0
+    n_skipped = 0
+    skipped_paths = []
     for trc_path in trc_paths:
         t_s, markers, data_rate_hz = load_trc_full(trc_path)
         if t_s is None or markers is None or len(t_s) < 2:
+            n_skipped += 1
+            if args.debug_discovery and len(skipped_paths) < 25:
+                skipped_paths.append(trc_path)
             continue
+        n_loaded += 1
         sid, trial_name = _split_session_trial_from_trc_path(trc_path)
         pid = sid  # best-effort; for this local workflow we treat session as participant label
         t_start, t_end = float(t_s[0]), float(t_s[-1])
@@ -1110,6 +1142,13 @@ def main():
     if not all_trials_flat:
         print("TRC discovery succeeded but none could be loaded.")
         return
+    if args.debug_discovery:
+        print(f"[debug] Loaded trials (usable TRCFile): {n_loaded}")
+        print(f"[debug] Skipped trials (load/time issues): {n_skipped}")
+        if skipped_paths:
+            print("[debug] Example skipped TRCs:")
+            for p in skipped_paths:
+                print(f"  - {p}")
 
     for trial_idx, trial in enumerate(all_trials_flat):
         pid = trial['participant_id']

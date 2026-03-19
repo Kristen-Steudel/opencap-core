@@ -125,41 +125,61 @@ def median_filter_trc_file(input_trc_path, output_trc_path, window=7):
     # Save filtered data to new TRC file
     utilsTRC.dict_2_trc(input_trc_path, filtered_markers, time, output_trc_path)
     import matplotlib.pyplot as plt
-    
-    print("Testing median_window_filter...")
-    
-    # Test 1: Simple signal with spikes
-    signal = np.array([1, 2, 3, 100, 5, 6, 7, 8, -50, 10], dtype=float)
-    filtered = median_window_filter(signal, window=5)
-    
-    print(f"Original: {signal}")
-    print(f"Filtered: {filtered}")
-    
-    # Test 2: 3D trajectory with spikes
-    print("\nTesting median_filter_trajectory...")
-    np.random.seed(42)
-    trajectory = np.random.randn(100, 3) * 0.1
-    trajectory += np.linspace(0, 1, 100)[:, np.newaxis]
-    
-    # Add spikes
-    trajectory[25, :] = [10, 10, 10]
-    trajectory[50, 0] = -5
-    trajectory[75, :] = [-8, -8, -8]
-    
-    filtered_trajectory = median_filter_trajectory(trajectory, window=7)
-    
-    # Visualize
+
+    # Create a plot to visualize the effect of the median filter on a sample marker
     fig, axes = plt.subplots(3, 1, figsize=(12, 9))
+    sample_marker = list(markers.keys())[12]  # Just take the first marker for visualization
+    original_traj = markers[sample_marker]
+    filtered_traj = filtered_markers[sample_marker]
     for i, coord in enumerate(['X', 'Y', 'Z']):
-        axes[i].plot(trajectory[:, i], 'o-', alpha=0.4, markersize=3, 
+        axes[i].plot(original_traj[:, i], 'o-', alpha=0.4, markersize=3, 
                     label='Original', color='lightblue')
-        axes[i].plot(filtered_trajectory[:, i], '-', linewidth=2, 
+        axes[i].plot(filtered_traj[:, i], '-', linewidth=2, 
                     label='Filtered', color='darkblue')
         axes[i].set_ylabel(f'{coord}')
+        axes[i].set_xlabel('Frame')
         axes[i].legend(loc='upper left')
         axes[i].grid(True, alpha=0.3)
-    
-    axes[0].set_title('Median Filter (Window=7) on 3D Trajectory')
-    axes[2].set_xlabel('Frame')
+        axes[0].set_title(f'Median Filter (Window={window}) on Marker: {sample_marker}')
     plt.tight_layout()
+    output_figure_path = output_trc_path.replace('.trc', '_median_filter_effect.png')
+    plt.savefig(output_figure_path, dpi=300)
     plt.show()
+    
+    # print("Testing median_window_filter...")
+    
+    # # Test 1: Simple signal with spikes
+    # signal = np.array([1, 2, 3, 100, 5, 6, 7, 8, -50, 10], dtype=float)
+    # filtered = median_window_filter(signal, window=5)
+    
+    # print(f"Original: {signal}")
+    # print(f"Filtered: {filtered}")
+    
+    # # Test 2: 3D trajectory with spikes
+    # print("\nTesting median_filter_trajectory...")
+    # np.random.seed(42)
+    # trajectory = np.random.randn(100, 3) * 0.1
+    # trajectory += np.linspace(0, 1, 100)[:, np.newaxis]
+    
+    # # Add spikes
+    # trajectory[25, :] = [10, 10, 10]
+    # trajectory[50, 0] = -5
+    # trajectory[75, :] = [-8, -8, -8]
+    
+    # filtered_trajectory = median_filter_trajectory(trajectory, window=7)
+    
+    # # Visualize
+    # fig, axes = plt.subplots(3, 1, figsize=(12, 9))
+    # for i, coord in enumerate(['X', 'Y', 'Z']):
+    #     axes[i].plot(trajectory[:, i], 'o-', alpha=0.4, markersize=3, 
+    #                 label='Original', color='lightblue')
+    #     axes[i].plot(filtered_trajectory[:, i], '-', linewidth=2, 
+    #                 label='Filtered', color='darkblue')
+    #     axes[i].set_ylabel(f'{coord}')
+    #     axes[i].legend(loc='upper left')
+    #     axes[i].grid(True, alpha=0.3)
+    
+    # axes[0].set_title('Median Filter (Window=7) on 3D Trajectory')
+    # axes[2].set_xlabel('Frame')
+    # plt.tight_layout()
+    # plt.show()
