@@ -530,6 +530,38 @@ def main(sessionName, trialName, trial_id, cameras_to_use=['all'],
             vertical_offset_settings = float(np.copy(vertical_offset)-0.01)
             vertical_offset = 0.01   
         
+        # %% Filter augmented markers with 15 Hz Butterworth low-pass filter.
+        if runMarkerAugmentation:
+            import scipy.signal
+            def butter_lowpass_filter(data, cutoff, fs, order=4):
+                nyq = 0.5 * fs
+                normal_cutoff = cutoff / nyq
+                b, a = scipy.signal.butter(order, normal_cutoff, btype='low', analog=False)
+                y = scipy.signal.filtfilt(b, a, data)
+                return y
+            
+            trc_augmented = utilsDataman.TRCFile(pathAugmentedOutputFiles[trialName])
+            fs = trc_augmented.data_rate
+            cutoff_freq = 15  # Hz
+            
+            print(f"Filtering augmented TRC with {cutoff_freq} Hz low-pass filter...")
+            for marker in trc_augmented.marker_names:
+                x = trc_augmented.marker(marker)[:, 0]
+                y = trc_augmented.marker(marker)[:, 1]
+                z = trc_augmented.marker(marker)[:, 2]
+                
+                x_filt = butter_lowpass_filter(x, cutoff_freq, fs)
+                y_filt = butter_lowpass_filter(y, cutoff_freq, fs)
+                z_filt = butter_lowpass_filter(z, cutoff_freq, fs)
+                
+                trc_augmented.data[marker + '_tx'] = x_filt
+                trc_augmented.data[marker + '_ty'] = y_filt
+                trc_augmented.data[marker + '_tz'] = z_filt
+            
+            pathFilteredTRC = pathAugmentedOutputFiles[trialName].replace('.trc', '_filt15Hz.trc')
+            trc_augmented.write(pathFilteredTRC)
+            print(f"Filtered TRC saved to: {pathFilteredTRC}")
+        
     # %% OpenSim pipeline.
     if runOpenSimPipeline:
         openSimPipelineDir = os.path.join(baseDir, "opensimPipeline")        
@@ -627,13 +659,19 @@ def main(sessionName, trialName, trial_id, cameras_to_use=['all'],
                 pathGenericSetupFile4IK = os.path.join(
                     openSimPipelineDir, 'IK', genericSetupFile4IKName)
                 # Path TRC file.
-                pathTRCFile4IK = pathAugmentedOutputFiles[trialName]
+
+                # I replaced this to test out filtering the augmented TRC file with a 15Hz Butterworth filter before running IK, to see if it improves shoulder kinematics. Antoine thinks it should, and that the lack of filtering might be why we see some high-frequency noise in the shoulder angles.
+                # using the filter_post_aug.py python script
+                ##  pathTRCFile4IK = pathAugmentedOutputFiles[trialName] 
+
+                # Use the post-augmented marker file filtered with 15Hz Butterworth.
+                pathTRCFile4IK = pathAugmentedOutputFiles[trialName].replace('.trc', '_filt15Hz.trc')
                 # Run IK tool. 
                 logging.info('Running Inverse Kinematics')
                 try:
                     pathOutputIK, pathModelIK = runIKTool(
                         pathGenericSetupFile4IK, pathScaledModel, 
-                        pathTRCFile4IK, outputIKDir)
+                        pathTRCFile4IK, outputIKDir, IKFileName=trial_id + '_filt15Hz')
                 except Exception as e:
                     if len(e.args) == 2: # specific exception
                         raise Exception(e.args[0], e.args[1])

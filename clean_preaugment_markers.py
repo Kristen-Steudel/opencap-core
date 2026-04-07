@@ -125,7 +125,7 @@ QUALITY_TOLERANCE_M = 0.080 # was 0.050  # max allowed deviation (m) from median
 QUALITY_VEL_THRESHOLD_M_S = 25.0 # Was 20.0
 
 # Sliding median filter: tight window to remove only very short (1-2 frame) artifacts.
-MEDIAN_FILTER_WINDOW_FRAMES = 10 # 10 = 5 each side of center. Uses np.nanmedian (handles NaN).
+MEDIAN_FILTER_WINDOW_FRAMES = 7 # 10 = 5 each side of center. Uses np.nanmedian (handles NaN).
 
 # Spline behavior:
 # Clamped boundary conditions (matching estimated endpoint slopes) can cause large
