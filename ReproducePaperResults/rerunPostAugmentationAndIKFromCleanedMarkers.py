@@ -129,6 +129,90 @@ def _file_exists_nonempty(path: str) -> bool:
     return os.path.isfile(path) and os.path.getsize(path) > 0
 
 
+def _parse_pose_and_camera_from_trc_path(trc_path: str) -> Tuple[str, str]:
+    """
+    Best-effort extraction of pose_dir_name and camera_setup from a TRC path like:
+      ...\\CleanedMarkerData\\OpenPose_default\\3-cameras\\PostAugmentation_v0.2\\file.trc
+    or
+      ...\\MarkerData\\OpenPose_default\\3-cameras\\PostAugmentation_v0.2\\file.trc
+    """
+    parts = os.path.normpath(trc_path).split(os.sep)
+    pose_dir = None
+    for i, p in enumerate(parts):
+        if p.startswith("OpenPose_"):
+            pose_dir = p
+            # Next segment is usually camera setup (e.g. 3-cameras)
+            if i + 1 < len(parts):
+                return pose_dir, parts[i + 1]
+            break
+    raise ValueError(f"Could not infer pose_dir/camera_setup from path: {trc_path}")
+
+
+def run_ik_only_for_postaug_trcs(
+    subject_dir: str,
+    repo_root: str,
+    dest_kin_root: str,
+    postaug_trc_paths: List[str],
+    overwrite: bool,
+) -> None:
+    session_metadata_path = os.path.join(subject_dir, "sessionMetadata.yaml")
+    if not os.path.isfile(session_metadata_path):
+        raise FileNotFoundError(f"Missing session metadata: {session_metadata_path}")
+
+    sessionMetadata = importMetadata(session_metadata_path)
+    openSimModel = sessionMetadata["openSimModel"]
+
+    suffix_model = "_shoulder" if "shoulder" in openSimModel else ""
+    ik_setup_filename = f"Setup_IK{suffix_model}.xml"
+    ik_setup_path = os.path.join(repo_root, "opensimPipeline", "IK", ik_setup_filename)
+    if not os.path.isfile(ik_setup_path):
+        raise FileNotFoundError(f"Missing IK setup file: {ik_setup_path}")
+
+    processed_any = False
+    for trc_path in postaug_trc_paths:
+        if not os.path.isfile(trc_path):
+            print(f"[{os.path.basename(subject_dir)}] Missing TRC: {trc_path}")
+            continue
+
+        pose_dir_name, camera_setup = _parse_pose_and_camera_from_trc_path(trc_path)
+
+        openSimDir = os.path.join(subject_dir, "OpenSimData", pose_dir_name, camera_setup)
+        scaled_model_path = os.path.join(openSimDir, "Model", f"{openSimModel}_scaled.osim")
+        if not os.path.isfile(scaled_model_path):
+            raise FileNotFoundError(
+                f"Scaled OpenSim model not found (needed for IK): {scaled_model_path}\n"
+                f"Make sure static trial scaling has been run successfully before re-running IK."
+            )
+
+        motion_out_dir = os.path.join(dest_kin_root, pose_dir_name, camera_setup, "Kinematics")
+        _ensure_dir(motion_out_dir)
+
+        base = os.path.splitext(os.path.basename(trc_path))[0]
+        mot_expected_path = os.path.join(motion_out_dir, f"{base}.mot")
+
+        if not overwrite and _file_exists_nonempty(mot_expected_path):
+            print(f"[{os.path.basename(subject_dir)}] Skip IK (exists): {base}")
+            continue
+
+        if overwrite and os.path.isfile(mot_expected_path):
+            try:
+                os.remove(mot_expected_path)
+            except OSError:
+                pass
+
+        print(f"[{os.path.basename(subject_dir)}] IK only: {os.path.basename(trc_path)}")
+        runIKTool(
+            ik_setup_path,
+            scaled_model_path,
+            trc_path,
+            motion_out_dir,
+        )
+        processed_any = True
+
+    if not processed_any:
+        print(f"[{os.path.basename(subject_dir)}] No IK outputs generated (no matching TRCs or all skipped).")
+
+
 def run_for_subject(
     subject_dir: str,
     repo_root: str,
@@ -138,8 +222,11 @@ def run_for_subject(
     camera_setups: Optional[List[str]],
     resolution_pose_detection: Optional[List[str]],
     trial_ids: Optional[List[str]],
+    trial_stems: Optional[List[str]],
+    keep_nosync_in_output: bool,
     overwrite: bool,
 ) -> None:
+    processed_any = False
     session_metadata_path = os.path.join(subject_dir, "sessionMetadata.yaml")
     if not os.path.isfile(session_metadata_path):
         raise FileNotFoundError(f"Missing session metadata: {session_metadata_path}")
@@ -214,9 +301,14 @@ def run_for_subject(
             )
 
         for inp in sorted(trial_inputs, key=lambda x: x.trial_id):
+            # Allow filtering by either the normalized trial_id (NoSync stripped)
+            # or the exact cleaned stem (e.g., ID5_S7_sprintNoSync).
             if trial_ids is not None and inp.trial_id not in trial_ids:
                 continue
-            augmented_filename = f"{inp.trial_id}_{markerAugmenterModelName}.trc"
+            if trial_stems is not None and inp.cleaned_base_key not in trial_stems:
+                continue
+            out_trial_stem = inp.cleaned_base_key if keep_nosync_in_output else inp.trial_id
+            augmented_filename = f"{out_trial_stem}_{markerAugmenterModelName}.trc"
             augmented_out_dir = os.path.join(
                 dest_marker_root,
                 pose_dir_name,
@@ -273,6 +365,34 @@ def run_for_subject(
                 motion_out_dir,
             )
 
+            processed_any = True
+
+    if not processed_any:
+        if trial_ids:
+            print(
+                f"[{os.path.basename(subject_dir)}] No trials matched --trial-id filter: {trial_ids}. "
+                f"(Tip: if your cleaned TRC stems contain 'NoSync', pass either form; the script normalizes it.)"
+            )
+        else:
+            print(f"[{os.path.basename(subject_dir)}] No trials were processed.")
+
+
+def _normalize_trial_ids(trial_ids: Optional[List[str]]) -> Optional[List[str]]:
+    """
+    Normalize user-provided trial ids to match how this script derives them.
+    In OpenCap local outputs, pre-augmentation stems often end with 'NoSync'.
+    This script strips 'NoSync' when deriving trial_id, so we do the same here.
+    """
+    if not trial_ids:
+        return None
+    out = []
+    for t in trial_ids:
+        t = str(t)
+        if t.endswith("NoSync"):
+            t = t[: -len("NoSync")]
+        out.append(t)
+    return out
+
 
 def main() -> None:
     parser = argparse.ArgumentParser(
@@ -318,6 +438,42 @@ def main() -> None:
         default=None,
         help="Optional trial_id filter (e.g., --trial-id 12026d04-... or --trial-id trialA trialB).",
     )
+    parser.add_argument(
+        "--trial-stem",
+        nargs="*",
+        default=None,
+        help=(
+            "Optional exact cleaned TRC stem filter (base filename without timestamp). "
+            "Example: ID5_S7_sprintNoSync"
+        ),
+    )
+    parser.add_argument(
+        "--keep-nosync-in-output",
+        action="store_true",
+        help=(
+            "If set, output filenames keep the cleaned stem (including 'NoSync' if present). "
+            "By default outputs use the normalized trial_id with 'NoSync' stripped."
+        ),
+    )
+    parser.add_argument(
+        "--postaug-trc",
+        nargs="*",
+        default=None,
+        help=(
+            "Run IK only on these already post-augmented TRC paths (skips LSTM augmentation). "
+            "Example: --postaug-trc \"G:\\...\\ID5_S7_sprintNoSync_LSTM_filt15Hz.trc\""
+        ),
+    )
+    parser.add_argument(
+        "--dest-marker-folder",
+        default="CleanedMarkerData",
+        help="Destination folder name under each subject (default: CleanedMarkerData).",
+    )
+    parser.add_argument(
+        "--dest-kin-folder",
+        default="CleanedKinematics",
+        help="Destination folder name under each subject (default: CleanedKinematics).",
+    )
 
     args = parser.parse_args()
 
@@ -332,12 +488,24 @@ def main() -> None:
             print(f"[subject{subj}] Missing directory: {subject_dir}")
             continue
 
-        dest_marker_root = os.path.join(subject_dir, "CleanedMarkerData")
-        dest_kin_root = os.path.join(subject_dir, "CleanedKinematics")
+        dest_marker_root = os.path.join(subject_dir, args.dest_marker_folder)
+        dest_kin_root = os.path.join(subject_dir, args.dest_kin_folder)
         _ensure_dir(dest_marker_root)
         _ensure_dir(dest_kin_root)
 
         print(f"=== Subject {subj} ===")
+        norm_trial_ids = _normalize_trial_ids(args.trial_id)
+
+        if args.postaug_trc:
+            run_ik_only_for_postaug_trcs(
+                subject_dir=subject_dir,
+                repo_root=repo_root,
+                dest_kin_root=dest_kin_root,
+                postaug_trc_paths=args.postaug_trc,
+                overwrite=args.overwrite,
+            )
+            continue
+
         run_for_subject(
             subject_dir=subject_dir,
             repo_root=repo_root,
@@ -346,7 +514,9 @@ def main() -> None:
             augmenter_model=args.augmenter_model,
             camera_setups=args.camera_setup,
             resolution_pose_detection=args.resolution_pose,
-            trial_ids=args.trial_id,
+            trial_ids=norm_trial_ids,
+            trial_stems=args.trial_stem,
+            keep_nosync_in_output=args.keep_nosync_in_output,
             overwrite=args.overwrite,
         )
 

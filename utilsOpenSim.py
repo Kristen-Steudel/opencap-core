@@ -1,4 +1,6 @@
 import os
+import subprocess
+import xml.etree.ElementTree as ET
 import utilsDataman
 import opensim
 import numpy as np
@@ -169,6 +171,99 @@ def runScaleTool(pathGenericSetupFile, pathGenericModel, subjectMass,
     return pathOutputModel
     
 # %% Inverse kinematics.
+def path_to_no_patella_model(path_scaled_model):
+    """
+    Path to the .osim file used for IK (scaled model with patellas stripped).
+    If *path_scaled_model* is already a *_no_patella.osim* file, returns that
+    path unchanged (avoids *_no_patella_no_patella.osim* from naive suffixing).
+    """
+    p = os.path.normpath(path_scaled_model)
+    base = os.path.basename(p)
+    if base.lower().endswith("_no_patella.osim"):
+        return p
+    return os.path.normpath(p.replace(".osim", "_no_patella.osim"))
+
+
+def ensure_scaled_model_without_patella(pathScaledModel):
+    """
+    Strip actuators, patellas, and patellofemoral joints from the scaled model
+    and write *_no_patella.osim beside the input. This matches what runIKTool
+    uses for IK. Returns the path to the written model file.
+
+    If the input is already *_no_patella.osim* and the file exists, returns it
+    without re-exporting (same file used for IK).
+    """
+    pathScaledModel = os.path.normpath(pathScaledModel)
+    base = os.path.basename(pathScaledModel)
+    if base.lower().endswith("_no_patella.osim") and os.path.isfile(pathScaledModel):
+        return pathScaledModel
+
+    opensim.Logger.setLevelString('error')
+    model = opensim.Model(pathScaledModel)
+    forceSet = model.getForceSet()
+    forceSet.setSize(0)
+    constraintSet = model.getConstraintSet()
+    patellofemoral_constraints = [
+        'patellofemoral_knee_angle_r_con', 'patellofemoral_knee_angle_l_con']
+    for patellofemoral_constraint in patellofemoral_constraints:
+        i = constraintSet.getIndex(patellofemoral_constraint, 0)
+        constraintSet.remove(i)
+    bodySet = model.getBodySet()
+    patella_bodies = ['patella_r', 'patella_l']
+    for patella in patella_bodies:
+        i = bodySet.getIndex(patella, 0)
+        bodySet.remove(i)
+    jointSet = model.getJointSet()
+    patellofemoral_joints = ['patellofemoral_r', 'patellofemoral_l']
+    for patellofemoral in patellofemoral_joints:
+        i = jointSet.getIndex(patellofemoral, 0)
+        jointSet.remove(i)
+    model.finalizeConnections
+    model.initSystem()
+    pathScaledModelWithoutPatella = path_to_no_patella_model(pathScaledModel)
+    model.printToXML(pathScaledModelWithoutPatella)
+    return pathScaledModelWithoutPatella
+
+
+def _xml_local_tag(elem):
+    if elem is None:
+        return ""
+    t = elem.tag
+    return t.split("}")[-1] if "}" in t else t
+
+
+def _read_ik_setup_xml_meta(path_setup_xml):
+    """
+    Read InverseKinematicsTool @name and <output_motion_file> from setup XML.
+    OpenSim often writes the .mot using these, not the TRC stem.
+    """
+    tool_name = None
+    output_motion = None
+    try:
+        tree = ET.parse(path_setup_xml)
+        root = tree.getroot()
+        ik = None
+        for el in root.iter():
+            if _xml_local_tag(el) == "InverseKinematicsTool":
+                ik = el
+                break
+        if ik is None:
+            return None, None
+        tool_name = ik.get("name")
+        el = None
+        for ch in list(ik):
+            if _xml_local_tag(ch) == "output_motion_file":
+                el = ch
+                break
+        if el is not None and el.text and str(el.text).strip():
+            cand = str(el.text).strip()
+            if cand.lower() != "unassigned":
+                output_motion = cand
+    except Exception as e:
+        logging.warning("Could not read IK setup XML metadata: %s", e)
+    return tool_name, output_motion
+
+
 def runIKTool(pathGenericSetupFile, pathScaledModel, pathTRCFile,
               pathOutputFolder, timeRange=[], IKFileName='not_specified'):
     
@@ -177,54 +272,43 @@ def runIKTool(pathGenericSetupFile, pathScaledModel, pathTRCFile,
     logging.info(f"IK TRC file: {pathTRCFile}")
     logging.info(f"IK output dir: {pathOutputFolder}")
 
-    # Paths
-    if IKFileName == 'not_specified':
-        _, IKFileName = os.path.split(pathTRCFile)
-        IKFileName = IKFileName[:-4]
-    pathOutputMotion = os.path.join(
-        pathOutputFolder, IKFileName + '.mot')
-    pathOutputSetup =  os.path.join(
-        pathOutputFolder, 'Setup_IK_' + IKFileName + '.xml')
-    
-    # To make IK faster, we remove the patellas and their constraints from the
-    # model. Constraints make the IK problem more difficult, and the patellas
-    # are not used in the IK solution for this particular model. Since muscles
-    # are attached to the patellas, we also remove all muscles.
-    opensim.Logger.setLevelString('error')
-    model = opensim.Model(pathScaledModel)
-    # Remove all actuators.                                         
-    forceSet = model.getForceSet()
-    forceSet.setSize(0)
-    # Remove patellofemoral constraints.
-    constraintSet = model.getConstraintSet()
-    patellofemoral_constraints = [
-        'patellofemoral_knee_angle_r_con', 'patellofemoral_knee_angle_l_con']
-    for patellofemoral_constraint in patellofemoral_constraints:
-        i = constraintSet.getIndex(patellofemoral_constraint, 0)
-        constraintSet.remove(i)       
-    # Remove patella bodies.
-    bodySet = model.getBodySet()
-    patella_bodies = ['patella_r', 'patella_l']
-    for patella in patella_bodies:
-        i = bodySet.getIndex(patella, 0)
-        bodySet.remove(i)
-    # Remove patellofemoral joints.
-    jointSet = model.getJointSet()
-    patellofemoral_joints = ['patellofemoral_r', 'patellofemoral_l']
-    for patellofemoral in patellofemoral_joints:
-        i = jointSet.getIndex(patellofemoral, 0)
-        jointSet.remove(i)
-    # Print the model to a new file.
-    model.finalizeConnections
-    model.initSystem()
-    pathScaledModelWithoutPatella = pathScaledModel.replace('.osim', '_no_patella.osim')
-    model.printToXML(pathScaledModelWithoutPatella)   
+    # Paths (absolute — relative paths can make IK write .mot elsewhere)
+    pathOutputFolder = os.path.abspath(os.path.normpath(pathOutputFolder))
+    pathGenericSetupFile = os.path.abspath(os.path.normpath(pathGenericSetupFile))
 
-    # Setup IK tool.    
-    IKTool = opensim.InverseKinematicsTool(pathGenericSetupFile)            
+    tool_name_xml, output_motion_xml = _read_ik_setup_xml_meta(pathGenericSetupFile)
+
+    if IKFileName == 'not_specified':
+        if tool_name_xml:
+            IKFileName = tool_name_xml
+        else:
+            _, IKFileName = os.path.split(pathTRCFile)
+            IKFileName = IKFileName[:-4]
+
+    if output_motion_xml:
+        pathOutputMotion = os.path.abspath(os.path.normpath(output_motion_xml))
+        # Always place the .mot under the requested output folder (basename from XML).
+        if os.path.normcase(os.path.dirname(pathOutputMotion)) != os.path.normcase(
+            pathOutputFolder
+        ):
+            pathOutputMotion = os.path.join(
+                pathOutputFolder, os.path.basename(pathOutputMotion)
+            )
+    else:
+        pathOutputMotion = os.path.abspath(
+            os.path.join(pathOutputFolder, IKFileName + '.mot'))
+
+    pathOutputSetup = os.path.abspath(
+        os.path.join(pathOutputFolder, 'Setup_IK_' + IKFileName + '.xml'))
+    
+    pathScaledModelWithoutPatella = ensure_scaled_model_without_patella(pathScaledModel)
+
+    # Setup IK tool (absolute path avoids cwd-relative resolution issues on Windows).
+    IKTool = opensim.InverseKinematicsTool(
+        os.path.abspath(os.path.normpath(pathGenericSetupFile)))            
     IKTool.setName(IKFileName)
-    IKTool.set_model_file(pathScaledModelWithoutPatella)          
-    IKTool.set_marker_file(pathTRCFile)
+    IKTool.set_model_file(os.path.abspath(os.path.normpath(pathScaledModelWithoutPatella)))
+    IKTool.set_marker_file(os.path.abspath(os.path.normpath(pathTRCFile)))
     if timeRange:
         IKTool.set_time_range(0, timeRange[0])
         IKTool.set_time_range(1, timeRange[-1])
@@ -232,10 +316,96 @@ def runIKTool(pathGenericSetupFile, pathScaledModel, pathTRCFile,
     IKTool.set_report_errors(True)
     IKTool.set_report_marker_locations(False)
     IKTool.set_output_motion_file(pathOutputMotion)
-    IKTool.printToXML(pathOutputSetup)
-    command = 'opensim-cmd -o error' + ' run-tool ' + '"' + pathOutputSetup + '"'
-    os.system(command)
-    
+
+    # Prefer in-process IK (same OpenSim DLL as this Python). On Windows,
+    # opensim-cmd often exits with -1073741819 (0xC0000005 access violation)
+    # even when the Python API runs the same tool successfully.
+    force_opensim_cmd = os.environ.get("OPENCAP_IK_FORCE_OPENSIM_CMD", "").strip().lower() in (
+        "1",
+        "true",
+        "yes",
+    )
+
+    if (not force_opensim_cmd) and hasattr(IKTool, "run"):
+        try:
+            # Run from in-memory tool state. Writing setup XML *before* run() can
+            # leave disk out of sync with set_* calls; that confused some builds.
+            ik_ret = IKTool.run()
+        except Exception as e:
+            raise RuntimeError(
+                f"InverseKinematicsTool.run() failed. Setup would be: {pathOutputSetup}"
+            ) from e
+
+        if ik_ret is not None and ik_ret is False:
+            raise RuntimeError(
+                f"InverseKinematicsTool.run() returned False. Expected .mot: {pathOutputMotion}"
+            )
+
+        if not os.path.isfile(pathOutputMotion):
+            try:
+                gom = IKTool.get_output_motion_file()
+                if gom:
+                    alt = os.path.abspath(os.path.normpath(str(gom)))
+                    if os.path.isfile(alt):
+                        pathOutputMotion = alt
+            except Exception:
+                pass
+        if not os.path.isfile(pathOutputMotion):
+            mots = sorted(glob.glob(os.path.join(pathOutputFolder, "*.mot")))
+            if len(mots) == 1:
+                pathOutputMotion = mots[0]
+
+        if not os.path.isfile(pathOutputMotion):
+            cwd_mot = os.path.abspath(IKFileName + ".mot")
+            extra = ""
+            if os.path.isfile(cwd_mot):
+                extra = f" Found unexpected file at process CWD: {cwd_mot}"
+            raise RuntimeError(
+                "IK finished but the motion file was not written to the expected path:\n"
+                f"  {pathOutputMotion}{extra}\n"
+                f"Files in results dir: {sorted(glob.glob(os.path.join(pathOutputFolder, '*')))}"
+            )
+
+        if os.path.getsize(pathOutputMotion) < 50:
+            raise RuntimeError(
+                f"IK wrote a tiny or empty .mot ({pathOutputMotion}); check marker/TRC mismatch."
+            )
+
+        IKTool.printToXML(pathOutputSetup)
+    else:
+        IKTool.printToXML(pathOutputSetup)
+        cmd = ["opensim-cmd", "-o", "error", "run-tool", pathOutputSetup]
+        proc = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            shell=False,
+        )
+        if proc.stdout:
+            logging.info(proc.stdout)
+            print(proc.stdout, end="" if proc.stdout.endswith("\n") else "\n")
+        if proc.stderr:
+            logging.info(proc.stderr)
+            print(proc.stderr, end="" if proc.stderr.endswith("\n") else "\n")
+        if proc.returncode != 0:
+            rc = proc.returncode
+            hint = ""
+            if rc == -1073741819 or (rc & 0xFFFFFFFF) == 0xC0000005:
+                hint = (
+                    " (0xC0000005 STATUS_ACCESS_VIOLATION: native crash in opensim-cmd. "
+                    "Try running from an environment where `import opensim` works; "
+                    "this codebase prefers InverseKinematicsTool.run() in-process.)"
+                )
+            raise RuntimeError(
+                f"opensim-cmd failed with exit status {rc!r}.{hint}\n"
+                f"setup: {pathOutputSetup}"
+            )
+
+        if not os.path.isfile(pathOutputMotion) or os.path.getsize(pathOutputMotion) < 50:
+            raise RuntimeError(
+                f"opensim-cmd exited 0 but .mot missing or empty: {pathOutputMotion}"
+            )
+
     return pathOutputMotion, pathScaledModelWithoutPatella
     
     

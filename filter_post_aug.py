@@ -7,7 +7,7 @@ import utilsDataman
 # ============================================================================
 # CONFIGURATION - ADJUST FOR EACH RUN
 # ============================================================================
-subject_num = 2
+subject_num = 5
 date = 'March_2'
 session = '7'
 trial_type = 'sprint'
@@ -20,7 +20,7 @@ angular_vel_filter_freq = 2  # Hz (for step detection)
 # SETUP TRC FILE PATH
 # ============================================================================
 
-trc_file_name = f'ID{subject_num}_S{session}_{trial_type}_LSTM.trc'
+trc_file_name = f'ID{subject_num}_S{session}_{trial_type}NoSync_LSTM.trc' # OR f'ID{subject_num}_S{session}_{trial_type}NoSync_LSTM.trc'
 trc_file_path = os.path.join(
     'G:\\Shared drives\\Stanford Football',
     date,

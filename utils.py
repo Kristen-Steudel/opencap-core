@@ -19,8 +19,8 @@ import pandas as pd
 from scipy import signal
 from urllib3.util.retry import Retry
 
-from utilsAuth import getToken
-from utilsAPI import getAPIURL
+#from utilsAuth import getToken
+#from utilsAPI import getAPIURL
 
 
 
@@ -33,8 +33,8 @@ from scipy.signal.windows import gaussian
 
 
 
-API_URL = getAPIURL()
-API_TOKEN = getToken()
+#API_URL = getAPIURL()
+#API_TOKEN = getToken()
 
 #%% Rest of utils
 
@@ -1840,6 +1840,12 @@ def makeRequestWithRetry(method, url,
 import utilsAPI
 API_URL = utilsAPI.get_api_url()
 API_TOKEN = get_token()
+# NOTE (local-only friendly): remove import utilsAPI
+# Do NOT import cloud/AWS dependencies at module import time.
+# The OpenCap cloud utilities in this file expect `utilsAPI` (which can depend on `boto3`)
+# and an API token. If you need cloud access, import and use `utilsCloud.py` instead.
+#API_URL = None
+#API_TOKEN = None
 
 def download_file(url, file_name):
     with urllib.request.urlopen(url) as response, open(file_name, 'wb') as out_file:

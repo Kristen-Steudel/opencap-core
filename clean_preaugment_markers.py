@@ -406,40 +406,76 @@ def _split_session_trial_from_trc_path(trc_path):
     return session_id, trial_name
 
 
-def discover_preaugment_trcs(input_root, include_cleaned=False):
+def discover_preaugment_trcs(input_root, include_cleaned=False, fixed_preaug_rel=None):
     """
-    Recursively find `.trc` files under `input_root` that look like PreAugmentation marker files.
-    Prefers files in typical OpenCap-style folders such as:
-      - MarkerData/PreAugmentation
-      - MarkerData/OpenPose_default/3-cameras/PreAugmentation
+    Direct discovery of `.trc` files in a known PreAugmentation folder.
 
+    This workflow assumes TRCs always live at:
+      <subjectDir>/<fixed_preaug_rel>/*.trc
+
+    Where `input_root` can be either:
+    - a subject folder (e.g., .../March_2/subject5), or
+    - a date folder containing multiple subject folders (e.g., .../March_2)
+
+    No recursive crawling is performed.
     Returns: list[str] absolute paths, sorted.
     """
     input_root = os.path.abspath(input_root)
+
+    if not fixed_preaug_rel:
+        raise ValueError(
+            "Direct discovery requires --fixed-preaug-rel. Example: "
+            r'"MarkerData\OpenPose_default\3-cameras\PreAugmentation"'
+        )
+
+    fixed_preaug_rel = os.path.normpath(fixed_preaug_rel)
+    candidate_dirs = []
+
+    # Case 1: input_root is a subject folder.
+    p = os.path.join(input_root, fixed_preaug_rel)
+    if os.path.isdir(p):
+        candidate_dirs.append(p)
+    else:
+        # Case 2: input_root is a parent folder (e.g., date) containing subject folders.
+        for name in os.listdir(input_root):
+            if not name.lower().startswith('subject'):
+                continue
+            subj_dir = os.path.join(input_root, name)
+            if not os.path.isdir(subj_dir):
+                continue
+            pp = os.path.join(subj_dir, fixed_preaug_rel)
+            if os.path.isdir(pp):
+                candidate_dirs.append(pp)
+
     out = []
-    for root, dirs, files in os.walk(input_root):
-        # Skip Cleaned unless explicitly included
-        if not include_cleaned and os.path.basename(root).lower() == 'cleaned':
+    for d in candidate_dirs:
+        try:
+            for fn in os.listdir(d):
+                if not fn.lower().endswith('.trc'):
+                    continue
+                full = os.path.join(d, fn)
+                if os.path.isfile(full):
+                    out.append(full)
+        except Exception:
             continue
-        for fn in files:
-            if not fn.lower().endswith('.trc'):
+
+    # Optionally add TRCs from Cleaned/ under the same PreAugmentation folder.
+    if include_cleaned:
+        for d in candidate_dirs:
+            cleaned_dir = os.path.join(d, "Cleaned")
+            if not os.path.isdir(cleaned_dir):
                 continue
-            full = os.path.join(root, fn)
-            norm = os.path.normpath(full).lower()
-            # Match both MarkerData/PreAugmentation and deeper variants such as
-            # MarkerData/OpenPose_default/3-cameras/PreAugmentation.
-            if ('{}markerdata{}'.format(os.sep, os.sep) in norm) and ('{}preaugmentation{}'.format(os.sep, os.sep) in norm):
-                out.append(full)
-    # If none matched the typical pattern, fall back to "any TRC under root"
-    if not out:
-        for root, dirs, files in os.walk(input_root):
-            if not include_cleaned and os.path.basename(root).lower() == 'cleaned':
+            try:
+                for fn in os.listdir(cleaned_dir):
+                    if not fn.lower().endswith(".trc"):
+                        continue
+                    full = os.path.join(cleaned_dir, fn)
+                    if os.path.isfile(full):
+                        out.append(full)
+            except Exception:
                 continue
-            for fn in files:
-                if fn.lower().endswith('.trc'):
-                    out.append(os.path.join(root, fn))
-    out = sorted(set(out))
-    return out
+
+    return sorted(set(out))
 
 
 def load_trc_full(trc_path):
@@ -1036,6 +1072,10 @@ def main():
                         help='Where to save PNG overviews and edit-log CSV.')
     parser.add_argument('--include-cleaned', action='store_true',
                         help='Also include TRCs found under a Cleaned/ folder (default: skip).')
+    parser.add_argument('--fixed-preaug-rel', default=None,
+                        help=('If provided, skip recursive discovery and only load TRCs from this '
+                              'relative PreAugmentation path inside each subject folder. Example: '
+                              '"MarkerData\\OpenPose_default\\3-cameras\\PreAugmentation"'))
     parser.add_argument('--no-review', action='store_true',
                         help='Do not open interactive windows; only save per-trial overview PNGs.')
     parser.add_argument('--debug-discovery', action='store_true',
@@ -1046,7 +1086,11 @@ def main():
     do_review = not args.no_review
     out_dir = args.out_dir
 
-    trc_paths = discover_preaugment_trcs(input_root, include_cleaned=args.include_cleaned)
+    trc_paths = discover_preaugment_trcs(
+        input_root,
+        include_cleaned=args.include_cleaned,
+        fixed_preaug_rel=args.fixed_preaug_rel,
+    )
     if not trc_paths:
         print(f"No TRC files found under: {input_root}")
         return

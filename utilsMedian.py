@@ -18,6 +18,8 @@ def median_window_filter(x, window):
     Output:
         y       <-  median filtered signal
     """
+
+    # To take care of an even window size if you accidentally put one in. But choosing an odd window size is better.
     if window % 2:
         window = window - 1 # Making the window even for equal points on left and right 
     win2 = int(window / 2) # Now win2 is always an integer

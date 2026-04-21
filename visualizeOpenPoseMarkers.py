@@ -5,8 +5,22 @@ import utilsTRC
 import utilsMedian
 import utilsPlotting
 
+# This script is used to visualize markers from a pre-augmentation trc file
+
+# ============================================================================
+# CONFIGURATION - ADJUST FOR EACH RUN
+
+date = 'March_2'
+subject_num = 5
+session = 7
+trial_type = 'sprint'
+trc_file_name = f'ID{subject_num}_S{session}_{trial_type}NoSync.trc' # Try out the normal trc and the NoSync trc files
+# ============================================================================
+# END OF CONFIGURATION - ADJUST FOR EACH RUN
+
+
 # Path to trc file
-trc_file_path = r"G:\Shared drives\Stanford Football\March_2\subject2\MarkerData\OpenPose_default\3-cameras\PreAugmentation\ID2_S7_sprint.trc"
+trc_file_path = fr"G:\Shared drives\Stanford Football\{date}\subject{subject_num}\MarkerData\OpenPose_default\3-cameras\PreAugmentation\{trc_file_name}"
 
 # Read the trc file
 data = utilsTRC.trc_2_dict(trc_file_path)
