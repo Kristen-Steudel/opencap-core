@@ -20,6 +20,8 @@ IK_SETUP_PATH = os.path.join(
     "Setup_IK.xml",
 )
 
+# Change the output directory and the IKFileName to match which method I am testing out.
+
 # Scaled OpenSim model (.osim). runIKTool builds/uses *_no_patella.osim next to it for IK.
 MODEL_PATH = r"G:\Shared drives\Stanford Football\March_2\subject5\OpenSimData\OpenPose_default\3-cameras\Model\LaiUhlrich2022_scaled.osim"
 
@@ -33,6 +35,8 @@ OUTPUT_DIR = r"G:\Shared drives\Stanford Football\AnalysisCompare\LengthFilt"
 # If True, pass an explicit finite time range from the TRC.
 # This avoids relying on -Inf/Inf time_range in XML (which has caused native crashes in some OpenSim builds).
 USE_TRC_TIME_RANGE = True
+
+IKFileName = 'ID5_S7_sprint_LSTM_OnlyLengthFilt'
 
 
 def main():
@@ -75,7 +79,7 @@ def main():
             print(f"  TRC time range: {time_range[0]} to {time_range[1]}", flush=True)
 
         path_output_mot, _ = runIKTool(
-            ik_setup, model_path, trc_path, output_dir, timeRange=time_range
+            ik_setup, model_path, trc_path, output_dir, timeRange=time_range, IKFileName=IKFileName
         )
         print(f"runIKTool returned: {path_output_mot}", flush=True)
         print(f"Returned path exists: {os.path.isfile(path_output_mot)}", flush=True)
