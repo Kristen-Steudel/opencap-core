@@ -77,19 +77,29 @@ try:
 except ImportError:
     TRCFile = None
 
-# --- Input parameters ---
-# CHANGE OUTPUT DIR
-OUT_DIR = os.path.join('PreAugment_QC', 'Plots', 'PreAugment_markers_by_participant')  # where to save PNGs and edit log CSV
-########################
+# ---------------------------------------------------------------------------
+# Edit these before each run — no terminal arguments needed.
+# ---------------------------------------------------------------------------
 
-# Base dir for discovering local PreAugmentation TRCs.
-# Set PREAUGMENT_BASE_DIR env var or pass --input-root.
-# Cleaned TRCs save next to originals in `.../MarkerData/PreAugmentation/Cleaned/`.
+# Subject root folder (the folder that contains MarkerData, OpenSimData, etc.)
+INPUT_ROOT = r"G:\Shared drives\Stanford Football\March_2\subject5"
+
+# Relative path from INPUT_ROOT to the PreAugmentation folder.
+FIXED_PREAUG_REL = r"MarkerData\OpenPose_default\3-cameras\PreAugmentation"
+
+# Where to save PNG overviews and the edit-log CSV.
+OUT_DIR = os.path.join('PreAugment_QC', 'Plots', 'PreAugment_markers_by_participant')
+
+# ---------------------------------------------------------------------------
+
+# Internal fallback (only used if INPUT_ROOT above is left empty).
 _OPENCAP_CORE_DATA = os.path.normpath(os.path.join(_SCRIPT_DIR, '..', '..', '..', 'opencap-core', 'Examples', 'Data'))
-if os.environ.get('PREAUGMENT_BASE_DIR'):
-    PREAUGMENT_BASE_DIR_DEFAULT = os.environ.get('PREAUGMENT_BASE_DIR')  # env override
+if INPUT_ROOT.strip():
+    PREAUGMENT_BASE_DIR_DEFAULT = INPUT_ROOT.strip()
+elif os.environ.get('PREAUGMENT_BASE_DIR'):
+    PREAUGMENT_BASE_DIR_DEFAULT = os.environ.get('PREAUGMENT_BASE_DIR')
 elif os.path.isdir(_OPENCAP_CORE_DATA):
-    PREAUGMENT_BASE_DIR_DEFAULT = _OPENCAP_CORE_DATA  # opencap-core/Examples/Data
+    PREAUGMENT_BASE_DIR_DEFAULT = _OPENCAP_CORE_DATA
 else:
     PREAUGMENT_BASE_DIR_DEFAULT = os.getcwd()
 
@@ -1072,7 +1082,7 @@ def main():
                         help='Where to save PNG overviews and edit-log CSV.')
     parser.add_argument('--include-cleaned', action='store_true',
                         help='Also include TRCs found under a Cleaned/ folder (default: skip).')
-    parser.add_argument('--fixed-preaug-rel', default=None,
+    parser.add_argument('--fixed-preaug-rel', default=FIXED_PREAUG_REL or None,
                         help=('If provided, skip recursive discovery and only load TRCs from this '
                               'relative PreAugmentation path inside each subject folder. Example: '
                               '"MarkerData\\OpenPose_default\\3-cameras\\PreAugmentation"'))

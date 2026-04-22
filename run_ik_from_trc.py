@@ -26,17 +26,16 @@ IK_SETUP_PATH = os.path.join(
 MODEL_PATH = r"G:\Shared drives\Stanford Football\March_2\subject5\OpenSimData\OpenPose_default\3-cameras\Model\LaiUhlrich2022_scaled.osim"
 
 # Marker trial (.trc) — should match <marker_file> in the setup unless you rely on runIKTool to override it.
-TRC_PATH = r"G:\Shared drives\Stanford Football\March_2\subject5\MarkerData\OpenPose_default\3-cameras\PreAugmentation\PostAugmentation_v0.2\ID5_S7_sprint_LSTM.trc"
-
+TRC_PATH = r"G:\Shared drives\Stanford Football\AnalysisCompare\PostaugmentationMarkerFiles\ID5_S7_sprintNoSync_medFilt_LSTM_postaug_filt15Hz.trc"
 # Where to write the .mot and the saved Setup_IK_<trial>.xml (should match <results_directory> in your setup).
 # The .mot *filename* comes from <output_motion_file> / tool name in the setup XML when present (not only the TRC stem).
-OUTPUT_DIR = r"G:\Shared drives\Stanford Football\AnalysisCompare\LengthFilt"
+OUTPUT_DIR = r"G:\Shared drives\Stanford Football\AnalysisCompare\MedFiltPostAugFiltLengthFilt"
 
 # If True, pass an explicit finite time range from the TRC.
 # This avoids relying on -Inf/Inf time_range in XML (which has caused native crashes in some OpenSim builds).
 USE_TRC_TIME_RANGE = True
 
-IKFileName = 'ID5_S7_sprint_LSTM_OnlyLengthFilt'
+IKFileName = 'ID5_S7_sprint_LSTM_MedFiltPostAugFiltLengthFilt'
 
 
 def main():

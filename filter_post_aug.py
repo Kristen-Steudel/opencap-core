@@ -20,17 +20,20 @@ angular_vel_filter_freq = 2  # Hz (for step detection)
 # SETUP TRC FILE PATH
 # ============================================================================
 
-trc_file_name = f'ID{subject_num}_S{session}_{trial_type}NoSync_LSTM.trc' # OR f'ID{subject_num}_S{session}_{trial_type}NoSync_LSTM.trc'
-trc_file_path = os.path.join(
-    'G:\\Shared drives\\Stanford Football',
-    date,
-    f'subject{subject_num}',
-    'CleanedMarkerData',
-    'OpenPose_default',
-    '3-cameras',
-    'PostAugmentation_v0.2',
-    trc_file_name
-)
+#trc_file_name = f'ID{subject_num}_S{session}_{trial_type}NoSync_LSTM.trc' # OR f'ID{subject_num}_S{session}_{trial_type}NoSync_LSTM.trc'
+trc_file_name = 'ID5_S7_sprintNoSync_medFilt_LSTM.trc'
+trc_file_path = os.path.join('G:\\Shared drives\\Stanford Football','AnalysisCompare','PostaugmentationMarkerFiles',trc_file_name)
+
+# trc_file_path = os.path.join(
+#     'G:\\Shared drives\\Stanford Football',
+#     date,
+#     f'subject{subject_num}',
+#     'CleanedMarkerData',
+#     'OpenPose_default',
+#     '3-cameras',
+#     'PostAugmentation_v0.2',
+#     trc_file_name
+# )
 
 def butter_lowpass_filter(data, cutoff, fs, order=4):
     """
@@ -90,7 +93,7 @@ def filter_trc_markers(trc_path, cutoff_freq=15):
 
     # Create output path with suffix
     base, ext = os.path.splitext(trc_path)
-    new_path = base + '_filt15Hz' + ext
+    new_path = base + '_postaug_filt15Hz' + ext
 
     # Save the filtered TRC
     trc.write(new_path)

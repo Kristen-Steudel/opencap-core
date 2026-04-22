@@ -395,85 +395,69 @@ def _normalize_trial_ids(trial_ids: Optional[List[str]]) -> Optional[List[str]]:
 
 
 def main() -> None:
+    # ---------------------------------------------------------------------------
+    # Edit these constants instead of using terminal arguments.
+    # ---------------------------------------------------------------------------
+
+    # Dataset root containing subjectN folders (e.g. subject5).
+    DATA_ROOT = r"G:\Shared drives\Stanford Football\March_2"
+
+    # Which subject numbers to process.
+    SUBJECTS = [5]
+
+    # Pre-augmentation TRC to augment + run IK on.
+    # Set to a path string to process one specific file, or None to
+    # discover all cleaned TRCs under PreAugmentation/Cleaned/.
+    PREAUG_TRC = r"G:\Shared drives\Stanford Football\March_2\subject5\MarkerData\OpenPose_default\3-cameras\PreAugmentation\ID5_S7_sprintNoSync.trc"
+
+    # If you already have a post-augmented TRC and just want IK, set this.
+    # Set to None to run full augmentation + IK.
+    POSTAUG_TRC = None
+
+    # Scaled OpenSim model. Set to a path string to use a specific model,
+    # or None to infer from sessionMetadata.yaml (default).
+    MODEL_PATH = r"G:\Shared drives\Stanford Football\March_2\subject5\OpenSimData\OpenPose_default\3-cameras\Model\LaiUhlrich2022_scaled.osim"
+
+    # Augmenter model version (usually "v0.2").
+    AUGMENTER_MODEL = "v0.2"
+
+    # Camera setup filter, e.g. ["3-cameras"]. None = process all found.
+    CAMERA_SETUP = ["3-cameras"]
+
+    # OpenPose resolution filter, e.g. ["default"]. None = process all found.
+    RESOLUTION_POSE = ["default"]
+
+    # Destination folder names under each subject dir.
+    DEST_MARKER_FOLDER = "CleanedMarkerData"
+    DEST_KIN_FOLDER = "CleanedKinematics"
+
+    # If True, keep "NoSync" in output filenames.
+    KEEP_NOSYNC_IN_OUTPUT = True
+
+    # Overwrite existing outputs.
+    OVERWRITE = True
+
+    # ---------------------------------------------------------------------------
+
     parser = argparse.ArgumentParser(
         description="Rerun augmentation + IK using cleaned PreAugmentation marker TRCs."
     )
-    parser.add_argument(
-        "--data-root",
-        default=r"G:\Shared drives\Stanford Football\March_2",
-        help="Dataset root containing subject folders like subject2, subject3, ...",
-    )
-    parser.add_argument(
-        "--subjects",
-        nargs="*",
-        type=int,
-        default=[2],
-        help="Subject numbers (e.g., --subjects 2 3 4).",
-    )
-    parser.add_argument(
-        "--augmenter-model",
-        default="v0.2",
-        help="Feature-set version passed to augmentTRC (e.g., v0.1/v0.2).",
-    )
-    parser.add_argument(
-        "--camera-setup",
-        nargs="*",
-        default=None,
-        help="Filter which camera setup(s) to process (e.g., --camera-setup 3-cameras).",
-    )
-    parser.add_argument(
-        "--resolution-pose",
-        nargs="*",
-        default=None,
-        help="Filter which OpenPose resolution(s) to process (e.g., --resolution-pose default 1x1008_4scales).",
-    )
-    parser.add_argument(
-        "--overwrite",
-        action="store_true",
-        help="Overwrite existing augmented TRCs and IK .mot outputs in CleanedMarkerData/CleanedKinematics.",
-    )
-    parser.add_argument(
-        "--trial-id",
-        nargs="*",
-        default=None,
-        help="Optional trial_id filter (e.g., --trial-id 12026d04-... or --trial-id trialA trialB).",
-    )
-    parser.add_argument(
-        "--trial-stem",
-        nargs="*",
-        default=None,
-        help=(
-            "Optional exact cleaned TRC stem filter (base filename without timestamp). "
-            "Example: ID5_S7_sprintNoSync"
-        ),
-    )
-    parser.add_argument(
-        "--keep-nosync-in-output",
-        action="store_true",
-        help=(
-            "If set, output filenames keep the cleaned stem (including 'NoSync' if present). "
-            "By default outputs use the normalized trial_id with 'NoSync' stripped."
-        ),
-    )
-    parser.add_argument(
-        "--postaug-trc",
-        nargs="*",
-        default=None,
-        help=(
-            "Run IK only on these already post-augmented TRC paths (skips LSTM augmentation). "
-            "Example: --postaug-trc \"G:\\...\\ID5_S7_sprintNoSync_LSTM_filt15Hz.trc\""
-        ),
-    )
-    parser.add_argument(
-        "--dest-marker-folder",
-        default="CleanedMarkerData",
-        help="Destination folder name under each subject (default: CleanedMarkerData).",
-    )
-    parser.add_argument(
-        "--dest-kin-folder",
-        default="CleanedKinematics",
-        help="Destination folder name under each subject (default: CleanedKinematics).",
-    )
+    parser.add_argument("--data-root", default=DATA_ROOT)
+    parser.add_argument("--subjects", nargs="*", type=int, default=SUBJECTS)
+    parser.add_argument("--augmenter-model", default=AUGMENTER_MODEL)
+    parser.add_argument("--camera-setup", nargs="*", default=CAMERA_SETUP)
+    parser.add_argument("--resolution-pose", nargs="*", default=RESOLUTION_POSE)
+    parser.add_argument("--overwrite", action="store_true", default=OVERWRITE)
+    parser.add_argument("--trial-id", nargs="*", default=None)
+    parser.add_argument("--trial-stem", nargs="*", default=None)
+    parser.add_argument("--keep-nosync-in-output", action="store_true", default=KEEP_NOSYNC_IN_OUTPUT)
+    parser.add_argument("--postaug-trc", nargs="*", default=[POSTAUG_TRC] if POSTAUG_TRC else None)
+    parser.add_argument("--preaug-trc", default=PREAUG_TRC or None,
+                        help="Specific pre-augmentation TRC to process (augmentation + IK).")
+    parser.add_argument("--model-path", default=MODEL_PATH or None,
+                        help="Override scaled OpenSim model path (otherwise inferred from sessionMetadata).")
+    parser.add_argument("--dest-marker-folder", default=DEST_MARKER_FOLDER)
+    parser.add_argument("--dest-kin-folder", default=DEST_KIN_FOLDER)
 
     args = parser.parse_args()
 
@@ -506,6 +490,15 @@ def main() -> None:
             )
             continue
 
+        # If a specific pre-augmentation TRC was given, derive trial_stem from it
+        # and run only that trial.
+        extra_trial_stems = list(args.trial_stem or [])
+        if args.preaug_trc and os.path.isfile(args.preaug_trc):
+            stem = os.path.splitext(os.path.basename(args.preaug_trc))[0]
+            if stem not in extra_trial_stems:
+                extra_trial_stems.append(stem)
+            print(f"  Specific pre-aug TRC: {args.preaug_trc} (stem={stem})")
+
         run_for_subject(
             subject_dir=subject_dir,
             repo_root=repo_root,
@@ -515,7 +508,7 @@ def main() -> None:
             camera_setups=args.camera_setup,
             resolution_pose_detection=args.resolution_pose,
             trial_ids=norm_trial_ids,
-            trial_stems=args.trial_stem,
+            trial_stems=extra_trial_stems if extra_trial_stems else args.trial_stem,
             keep_nosync_in_output=args.keep_nosync_in_output,
             overwrite=args.overwrite,
         )
