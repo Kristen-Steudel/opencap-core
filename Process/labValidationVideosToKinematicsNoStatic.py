@@ -15,6 +15,7 @@ import shutil
 import yaml
 import openpyxl
 import re
+import traceback
 
 repoDir = os.path.abspath(
     os.path.join(os.path.dirname(os.path.abspath(__file__)),'../'))
@@ -31,7 +32,7 @@ from utilsExcel import update_progress_excel
 #   C:/Users/opencap/Documents/LabValidation_withVideos/subject2
 #   C:/Users/opencap/Documents/LabValidation_withVideos/subject3
 #   ...
-subject_numbers = [2]
+subject_numbers = [2, 3, 4, 5, 7, 8, 9, 11, 12, 13, 16, 19, 22,25, 26, 27, 28, 29, 31, 32, 33, 34, 35, 36, 41, 44, 45, 46, 49, 51, 52, 53, 54, 56, 57, 59, 60, 62, 63, 64, 65, 66, 68]
 sessionNames = [f'subject{num}' for num in subject_numbers] #['subject2']#,'subject4', 'subject7', 'subject8', 'subject9', 'subject10', 'subject11', 'subject13', 'subject14']
 
 # %% Excel Progress Tracking Setup
@@ -78,7 +79,7 @@ resolutionPoseDetection = 'default'#'default' #'1x1008_4scales'
 # Since the prepint release, we updated a new augmenter model. To use the model
 # used for generating the paper results, select v0.1. To use the latest model
 # (now in production), select v0.2.
-augmenter_model = 'v0.2'
+augmenter_model = 'v0.3'
 
 # %% Data re-organization
 # To reprocess the data, we need to re-organize the data so that the folder
@@ -176,9 +177,9 @@ for count, sessionName in enumerate(sessionNames):
             extrinsics_idx = trials_tmp.index(trial)           
     trials = [trials_tmp[extrinsics_idx]]
     for trial in trials_tmp:
-            if 'extrinsics' not in trial.lower():
+            if 'extrinsics' not in trial.lower() and 'trimmed' in trial.lower():
                 trials.append(trial)
-    
+
     for poseDetector in poseDetectors:
         for cameraSetup in cameraSetups:
             cam2Use = cam2sUse[cameraSetup]
@@ -217,17 +218,23 @@ for count, sessionName in enumerate(sessionNames):
                 intrinsicsFinalFolder = 'Deployed_720_60fps'
                                     
                     
-                process_trial(trial,
-                              session_name=sessionName,
-                              cam2Use=cam2Use, 
-                              intrinsicsFinalFolder=intrinsicsFinalFolder,
-                              extrinsicsTrial=extrinsicsTrial,
-                              markerDataFolderNameSuffix=cameraSetup,
-                              poseDetector=poseDetector,
-                              resolutionPoseDetection=resolutionPoseDetection,
-                              scaleModel=scaleModel, 
-                              augmenter_model=augmenter_model,
-                              dataDir=dataDir)
-
+                try:
+                    process_trial(trial,
+                                  session_name=sessionName,
+                                  cam2Use=cam2Use,
+                                  intrinsicsFinalFolder=intrinsicsFinalFolder,
+                                  extrinsicsTrial=extrinsicsTrial,
+                                  markerDataFolderNameSuffix=cameraSetup,
+                                  poseDetector=poseDetector,
+                                  resolutionPoseDetection=resolutionPoseDetection,
+                                  scaleModel=scaleModel,
+                                  augmenter_model=augmenter_model,
+                                  dataDir=dataDir,
+                                  runOpenSimPipeline=False)
+                    print('Finished {}'.format(trial))
+                except Exception as e:
+                    print('FAILED {} ({}): {}'.format(trial, sessionName, e))
+                    traceback.print_exc()
+                    continue
 
                 #update_progress_excel('March_2_Kinematics', '✓', sessionName)

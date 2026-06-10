@@ -73,8 +73,8 @@ def main(sessionName, trialName, trial_id, cameras_to_use=['all'],
     runTriangulation = True
     # Marker augmentation.
     runMarkerAugmentation = True
-    # OpenSim pipeline.
-    runOpenSimPipeline = True    
+    # OpenSim pipeline (respect argument; extrinsics trial forces False below).
+    runOpenSimPipeline = bool(runOpenSimPipeline)
     # High-resolution for OpenPose.
     resolutionPoseDetection = resolutionPoseDetection
     # Set to False to only generate the json files (default is True).
@@ -537,18 +537,21 @@ def main(sessionName, trialName, trial_id, cameras_to_use=['all'],
     augmenterModelName = (
         sessionMetadata['markerAugmentationSettings']['markerAugmenterModel'])
     
-    # Set output file name.
+    # Set output file name (match pre-augmentation _median_filt30Hz suffix when used).
+    median_filt_suffix = '_median_filt30Hz' if runMedianFilter else ''
     pathAugmentedOutputFiles = {}
     if genericFolderNames:
         pathAugmentedOutputFiles[trialName] = os.path.join(
-                postAugmentationDir, trial_id + ".trc")
+                postAugmentationDir, trial_id + median_filt_suffix + ".trc")
     else:
         if benchmark:
             pathAugmentedOutputFiles[trialName] = os.path.join(
-                    postAugmentationDir, trialName + "_" + augmenterModelName +".trc")
+                    postAugmentationDir,
+                    trialName + median_filt_suffix + "_" + augmenterModelName + ".trc")
         else:
             pathAugmentedOutputFiles[trialName] = os.path.join(
-                    postAugmentationDir, trial_id + "_" + augmenterModelName +".trc")
+                    postAugmentationDir,
+                    trial_id + median_filt_suffix + "_" + augmenterModelName + ".trc")
     
     if runMarkerAugmentation:
         os.makedirs(postAugmentationDir, exist_ok=True)    
