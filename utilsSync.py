@@ -2199,7 +2199,8 @@ def loadPresynchronizedVideos(CameraDirectories, trialRelativePath, pathPoseDete
         # Trim to minimum frame count
         keypointsSync.append(key[:, :minFrames, :])
         confidenceSync.append(confidence[:, :minFrames])
-        nansInOutSync.append(None)  # No NaN tracking without filtering
+        # Match synchronizeVideos: NaN in/out means "no sync-based trim" for this cam.
+        nansInOutSync.append(np.array([np.nan, np.nan]))
         # Start and end frames (0 to minFrames since no sync offset)
         startEndFrames.append([0, minFrames-1])
     

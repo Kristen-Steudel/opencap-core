@@ -1334,11 +1334,14 @@ def triangulateMultiviewVideo(CameraParamDict,keypointDict,imageScaleFactor=1,
             # inleading and exiting nans, which result in garbage interpolated
             # keypoints.        
             if nansInOut:
-                nans_in = [nansInOut[cam][0] for cam in nansInOut]
-                nans_out = [nansInOut[cam][1] for cam in nansInOut]
+                nans_in = [nansInOut[cam][0] for cam in nansInOut
+                           if nansInOut[cam] is not None]
+                nans_out = [nansInOut[cam][1] for cam in nansInOut
+                            if nansInOut[cam] is not None]
                 # When >2 cameras, all list entries will be nan. If >2 cameras, 
                 # but only 2 see person, will have 2 non-nan entries.
-                if not any(np.isnan(nans_in)) or np.sum(~np.isnan(nans_in)) == 2:  
+                if nans_in and (not any(np.isnan(nans_in)) or
+                                np.sum(~np.isnan(nans_in)) == 2):  
                     startInd = int(np.nanmax(
                         np.array([startInd, np.nanmax(np.asarray(nans_in))])))
                     endInd = int(np.nanmin(

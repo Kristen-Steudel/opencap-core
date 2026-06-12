@@ -57,7 +57,7 @@ def extract_subject_id_from_session(session_name):
         pass
     return None
 
-dataDir = os.path.normpath('G:\Shared drives\Stanford Football\March_2')
+dataDir = os.path.normpath('G:\Shared drives\Stanford Football\March_16')
 
 
 # The dataset includes 2 sessions per subject.The first session includes
