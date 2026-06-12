@@ -8,19 +8,31 @@ note in your table are omitted and skipped. Cameras run at 120 Hz:
 Output layout (same as NeutralTrialTrim):
     .../Videos/<Cam>/InputMedia/<trial>_trimmed/<trial>_trimmed.mp4
 
-Set ACTIVE_DAYS to the day(s) you want to process, then run:
-    python BatchCollectionDayTrim.py
+Set ACTIVE_DAYS to the day(s) you want to process. Optionally set
+ACTIVE_SUBJECTS = [4] to trim only subject4. Then run:
+    python Process/BatchTrimVideos.py
+
+When a collection day has include_all_subjects=True, every subject folder
+under data_root is processed. Subjects with trim notes are trimmed; subjects
+without trim notes get a full-length copy renamed to <trial>_trimmed so
+downstream code can always glob for *_trimmed trials.
 """
 
 import subprocess
 import os
 import json
+import re
+import shutil
 
 FFMPEG_PATH = 'ffmpeg'
 FPS = 120
 
 # Which collection day(s) to process. Keys must match COLLECTION_DAYS below.
 ACTIVE_DAYS = ['March_16']
+
+# Optional: limit to specific subject IDs, e.g. [4] for subject4 only.
+# Set to None to process all subjects for the active day(s).
+ACTIVE_SUBJECTS = None
 
 
 def f(seconds):
@@ -30,12 +42,12 @@ def f(seconds):
 
 def T(end_s):
     """Trim from start of video to end_s seconds."""
-    return {'start_frame': 0, 'end_frame': f(end_s)}
+    return {'start_frame': f(3), 'end_frame': f(end_s)}
 
 
 def R(start_s, end_s):
     """Trim from start_s to end_s seconds."""
-    return {'start_frame': f(start_s), 'end_frame': f(end_s)}
+    return {'start_frame': f(start_s + 3), 'end_frame': f(end_s)}
 
 
 # ---------------------------------------------------------------------------
@@ -46,6 +58,14 @@ COLLECTION_DAYS = {
         'data_root': r'G:\Shared drives\Stanford Football\March_16',
         'cameras': ['Cam1b', 'Cam4b', 'Cam7b'],
         'subject_trims': {
+            2: T(5.5),
+            3: T(5.5),
+            4: T(5.5),
+            6: T(5.5),
+            7: T(5.5),
+            8: T(5.5),
+            9: T(5.5),
+            11: T(5.5),
             12: R(4, 9),          # trim false start (seconds 4–9)
             16: R(3, 6),          # trim start (seconds 3–6)
             22: T(5),             # trim to end at 5 s
@@ -86,6 +106,9 @@ COLLECTION_DAYS = {
     'March_2': {
         'data_root': r'G:\Shared drives\Stanford Football\March_2',
         'cameras': ['Cam1b', 'Cam4b', 'Cam7b'],
+        # Process every subject{N} folder; subjects without trim notes get a
+        # full-length copy under <trial>_trimmed (same duration, renamed only).
+        'include_all_subjects': True,
         'subject_trims': {
             4:  T(7),
             8:  T(7.5),
@@ -324,8 +347,8 @@ def trim_video(input_file, start_frame, frame_count, output_file, fps=None):
     start_time = start_frame / fps
     duration = frame_count / fps
     print(f"\n  Processing: {os.path.basename(input_file)}")
-    print(f"    Frames {start_frame}–{start_frame + frame_count} "
-          f"({frame_count} frames, {start_time:.1f}–{start_time + duration:.1f} s)")
+    print(f"    Frames {start_frame}-{start_frame + frame_count} "
+          f"({frame_count} frames, {start_time:.1f}-{start_time + duration:.1f} s)")
     print(f"    Output: {output_file}")
 
     try:
@@ -344,12 +367,11 @@ def find_motion_trial(videos_dir, ref_cam):
     if not os.path.isdir(input_media):
         return None
 
-    skip = ('extrinsics', 'static')
+    skip = ('extrinsics', 'static', 'trimmed')
     trials = sorted([
         t for t in os.listdir(input_media)
         if os.path.isdir(os.path.join(input_media, t))
         and not any(s in t.lower() for s in skip)
-        and not t.endswith('_trimmed')
     ])
 
     if len(trials) == 1:
@@ -368,6 +390,63 @@ def find_input_video(trial_dir, trial_name):
     return None
 
 
+def discover_subject_numbers(data_root):
+    """Return sorted subject IDs from subject{N} folders under data_root."""
+    if not os.path.isdir(data_root):
+        return []
+    subject_nums = []
+    for name in os.listdir(data_root):
+        match = re.fullmatch(r'subject(\d+)', name, flags=re.IGNORECASE)
+        if match and os.path.isdir(os.path.join(data_root, name)):
+            subject_nums.append(int(match.group(1)))
+    return sorted(subject_nums)
+
+
+def copy_video_unchanged(input_file, output_file):
+    """Copy the full source video to the trimmed output path (no re-encode)."""
+    os.makedirs(os.path.dirname(output_file), exist_ok=True)
+    print(f"\n  Copying (no trim): {os.path.basename(input_file)}")
+    print(f"    Output: {output_file}")
+    shutil.copy2(input_file, output_file)
+    print("    SUCCESS")
+
+
+def copy_subject_as_trimmed(day_name, data_root, cameras, subject_num):
+    """Create <trial>_trimmed outputs as full-length copies of the source trial."""
+    videos_dir = os.path.join(data_root, f'subject{subject_num}', 'Videos')
+    trial_name = find_motion_trial(videos_dir, cameras[0])
+    if trial_name is None:
+        print(f"  SKIPPING subject {subject_num} — no motion trial found under {videos_dir}")
+        return
+
+    output_trial_name = trial_name + '_trimmed'
+
+    print(f"\n{'='*70}")
+    print(f"{day_name} | Subject {subject_num} | trial '{trial_name}' "
+          f"-> full-length copy as '{output_trial_name}'")
+    print(f"{'='*70}")
+
+    for cam in cameras:
+        input_dir = os.path.join(videos_dir, cam, 'InputMedia', trial_name)
+        input_path = find_input_video(input_dir, trial_name)
+
+        if input_path is None:
+            print(f"  [{cam}] SKIPPING — input not found in {input_dir}")
+            continue
+
+        output_dir = os.path.join(videos_dir, cam, 'InputMedia', output_trial_name)
+        output_path = os.path.join(output_dir, output_trial_name + '.mp4')
+        copy_video_unchanged(input_path, output_path)
+
+        actual_frames = verify_frame_count(output_path)
+        source_frames = verify_frame_count(input_path)
+        if actual_frames and source_frames:
+            print(f"    Verified: {actual_frames} frames copied "
+                  f"(source had {source_frames})")
+            if actual_frames != source_frames:
+                print("    WARNING: Copied frame count differs from source!")
+
+
 def trim_subject(day_name, data_root, cameras, subject_num, trim_cfg):
     start_frame = trim_cfg['start_frame']
     end_frame = trim_cfg['end_frame']
@@ -383,8 +462,8 @@ def trim_subject(day_name, data_root, cameras, subject_num, trim_cfg):
 
     print(f"\n{'='*70}")
     print(f"{day_name} | Subject {subject_num} | trial '{trial_name}' "
-          f"→ frames {start_frame}–{end_frame} "
-          f"({frame_count} frames, {start_frame/FPS:.1f}–{end_frame/FPS:.1f} s)")
+          f"-> frames {start_frame}-{end_frame} "
+          f"({frame_count} frames, {start_frame/FPS:.1f}-{end_frame/FPS:.1f} s)")
     print(f"{'='*70}")
 
     for cam in cameras:
@@ -411,16 +490,43 @@ def trim_subject(day_name, data_root, cameras, subject_num, trim_cfg):
 def process_day(day_name):
     cfg = COLLECTION_DAYS[day_name]
     subject_trims = cfg['subject_trims']
+    include_all_subjects = cfg.get('include_all_subjects', False)
+
+    if include_all_subjects:
+        subject_nums = discover_subject_numbers(cfg['data_root'])
+    else:
+        subject_nums = sorted(subject_trims)
+
+    if ACTIVE_SUBJECTS is not None:
+        subject_nums = [n for n in subject_nums if n in ACTIVE_SUBJECTS]
+        missing = [n for n in ACTIVE_SUBJECTS if n not in subject_nums]
+        for n in missing:
+            print(f"  WARNING: subject{n} not found under {cfg['data_root']}")
+
     print(f"\n{'#'*70}")
-    print(f"Collection day: {day_name}  ({len(subject_trims)} subjects with trim notes)")
+    print(f"Collection day: {day_name}")
     print(f"Data root: {cfg['data_root']}")
+    print(f"Subjects to process: {len(subject_nums)}")
+    if ACTIVE_SUBJECTS is not None:
+        print(f"  Filtered to ACTIVE_SUBJECTS: {ACTIVE_SUBJECTS}")
+    if include_all_subjects:
+        untrimmed = [n for n in subject_nums if n not in subject_trims]
+        print(f"  With trim notes: {len(subject_trims)}")
+        print(f"  Full-length copy as _trimmed: {len(untrimmed)}")
     print(f"{'#'*70}")
 
-    for subject_num in sorted(subject_trims):
-        trim_subject(
-            day_name, cfg['data_root'], cfg['cameras'],
-            subject_num, subject_trims[subject_num],
-        )
+    for subject_num in subject_nums:
+        if subject_num in subject_trims:
+            trim_subject(
+                day_name, cfg['data_root'], cfg['cameras'],
+                subject_num, subject_trims[subject_num],
+            )
+        elif include_all_subjects:
+            copy_subject_as_trimmed(
+                day_name, cfg['data_root'], cfg['cameras'], subject_num,
+            )
+        else:
+            print(f"  SKIPPING subject {subject_num} — no trim note for this day")
 
 
 def main():

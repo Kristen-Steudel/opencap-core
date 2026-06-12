@@ -842,6 +842,15 @@ def findClosestBox(bbox,keyBoxes,imageSize,iPerson=None):
         
     return iPerson,bbox,samePerson
 
+def get_rotated_video_path(videoPath):
+    """Prefer OpenPose's <stem>_rotated.avi sibling (works for .mp4 inputs)."""
+    base, _ = os.path.splitext(videoPath)
+    rotated = base + '_rotated.avi'
+    if os.path.isfile(rotated):
+        return rotated
+    return videoPath.replace('.mov', '_rotated.avi')
+
+
 #%%
 def trackKeypointBox(videoPath,bbStart,allPeople,allBoxes,dataOut,frameStart = 0 ,
                      frameIncrement = 1, visualize = False, poseDetector='OpenPose',
@@ -858,15 +867,16 @@ def trackKeypointBox(videoPath,bbStart,allPeople,allBoxes,dataOut,frameStart = 0
     frameNum = frameStart
 
     # initiate video capture
-    # Read video
-    video = cv2.VideoCapture(videoPath.replace('.mov', '_rotated.avi'))
+    # Read video (OpenPose writes *_rotated.avi for .mp4 sources too)
+    videoPath = get_rotated_video_path(videoPath)
+    video = cv2.VideoCapture(videoPath)
     nFrames = allBoxes[0].shape[0]
     
     # Read desiredFrames.
     video.set(1, frameNum)
     ok, frame = video.read()
     if not ok:
-        print('Cannot read video file')
+        print('Cannot read video file: {}'.format(videoPath))
         raise Exception('Cannot read video file')
         
     imageSize = (frame.shape[0],frame.shape[1])
@@ -945,7 +955,7 @@ def trackBoundingBox(videoPath,bbStart,allPeople,allBoxes,dataOut,frameStart = 0
     frameNum = frameStart
     
     # Read video
-    video = cv2.VideoCapture(videoPath.replace('.mov', '_rotated.avi'))
+    video = cv2.VideoCapture(get_rotated_video_path(videoPath))
     nFrames = allBoxes[0].shape[0]
 
     # Read desiredFrames.

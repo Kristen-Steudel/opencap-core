@@ -15,6 +15,8 @@ import shutil
 import yaml
 import openpyxl
 import re
+import traceback
+import glob
 
 repoDir = os.path.abspath(
     os.path.join(os.path.dirname(os.path.abspath(__file__)),'../'))
@@ -31,7 +33,7 @@ from utilsExcel import update_progress_excel
 #   C:/Users/opencap/Documents/LabValidation_withVideos/subject2
 #   C:/Users/opencap/Documents/LabValidation_withVideos/subject3
 #   ...
-subject_numbers = [2]
+subject_numbers = [2, 3, 4, 6, 7, 8, 9, 11, 12, 13, 16, 18, 19, 22, 23, 25, 26, 27, 28, 29, 31, 32, 33, 34, 36, 41, 46, 47, 49, 51, 52, 53, 54, 55, 56, 57, 59, 60,  62, 63, 64, 65, 66, 68]
 sessionNames = [f'subject{num}' for num in subject_numbers] #['subject2']#,'subject4', 'subject7', 'subject8', 'subject9', 'subject10', 'subject11', 'subject13', 'subject14']
 
 # %% Excel Progress Tracking Setup
@@ -78,7 +80,7 @@ resolutionPoseDetection = 'default'#'default' #'1x1008_4scales'
 # Since the prepint release, we updated a new augmenter model. To use the model
 # used for generating the paper results, select v0.1. To use the latest model
 # (now in production), select v0.2.
-augmenter_model = 'v0.2'
+augmenter_model = 'v0.3'
 
 # %% Data re-organization
 # To reprocess the data, we need to re-organize the data so that the folder
@@ -138,6 +140,36 @@ cam2sUse = {'5-cameras': ['Cam0', 'Cam1', 'Cam2', 'Cam3', 'Cam4'],
             '3-cameras': ['Cam1b', 'Cam4b', 'Cam7b'], # No b for days before Feb 2
             '2-cameras': ['Cam4', 'Cam7']}
 
+def is_trimmed_motion_trial(trial_name):
+    """Canonical trimmed trials from BatchTrimVideos end with '_trimmed'."""
+    return trial_name.lower().endswith('_trimmed')
+
+
+def clear_stale_openpose_outputs(session_dir, trial_name, cameras,
+                                 resolution_pose_detection='default'):
+    """
+    Remove OpenPose artifacts that may have been built from the full-length
+    sprint video before trimming. Stale pkls cause 'Cannot read video file'.
+    """
+    if not is_trimmed_motion_trial(trial_name):
+        return
+    suffix = resolution_pose_detection
+    for cam in cameras:
+        cam_dir = os.path.join(session_dir, 'Videos', cam)
+        for folder in (
+            f'OutputPkl_{suffix}',
+            f'OutputMedia_{suffix}',
+            f'OutputJsons_{suffix}',
+        ):
+            path = os.path.join(cam_dir, folder, trial_name)
+            if os.path.isdir(path):
+                shutil.rmtree(path)
+        rotated_avi = os.path.join(
+            cam_dir, 'InputMedia', trial_name, trial_name + '_rotated.avi')
+        if os.path.isfile(rotated_avi):
+            os.remove(rotated_avi)
+
+
 # # %% Functions for re-processing the data.
 def process_trial(trial_name=None, session_name=None, isDocker=False,
                   cam2Use=['all_available'], #changed from 'all'
@@ -168,16 +200,12 @@ for count, sessionName in enumerate(sessionNames):
                             'InputMedia')    
     # Work around to re-order trials and have the extrinsics trial firs, and
     # the static second (if available).
-    trials_tmp = os.listdir(pathCam0)
-    trials_tmp = [t for t in trials_tmp if
-                  os.path.isdir(os.path.join(pathCam0, t))]
-    for trial in trials_tmp:
-        if 'extrinsics' in trial.lower():                    
-            extrinsics_idx = trials_tmp.index(trial)           
-    trials = [trials_tmp[extrinsics_idx]]
-    for trial in trials_tmp:
-            if 'extrinsics' not in trial.lower():
-                trials.append(trial)
+    trials_tmp = sorted([
+        t for t in os.listdir(pathCam0)
+        if os.path.isdir(os.path.join(pathCam0, t))])
+    extrinsics_trials = [t for t in trials_tmp if 'extrinsics' in t.lower()]
+    trimmed_trials = [t for t in trials_tmp if is_trimmed_motion_trial(t)]
+    trials = extrinsics_trials + trimmed_trials
     
     for poseDetector in poseDetectors:
         for cameraSetup in cameraSetups:
@@ -215,19 +243,29 @@ for count, sessionName in enumerate(sessionNames):
                 scaleModel = False
 
                 intrinsicsFinalFolder = 'Deployed_720_60fps'
-                                    
-                    
-                process_trial(trial,
-                              session_name=sessionName,
-                              cam2Use=cam2Use, 
-                              intrinsicsFinalFolder=intrinsicsFinalFolder,
-                              extrinsicsTrial=extrinsicsTrial,
-                              markerDataFolderNameSuffix=cameraSetup,
-                              poseDetector=poseDetector,
-                              resolutionPoseDetection=resolutionPoseDetection,
-                              scaleModel=scaleModel, 
-                              augmenter_model=augmenter_model,
-                              dataDir=dataDir)
 
+                if is_trimmed_motion_trial(trial):
+                    clear_stale_openpose_outputs(
+                        os.path.join(dataDir, sessionName), trial, cam2Use,
+                        resolution_pose_detection=resolutionPoseDetection)
+
+                try:
+                    process_trial(trial,
+                                  session_name=sessionName,
+                                  cam2Use=cam2Use,
+                                  intrinsicsFinalFolder=intrinsicsFinalFolder,
+                                  extrinsicsTrial=extrinsicsTrial,
+                                  markerDataFolderNameSuffix=cameraSetup,
+                                  poseDetector=poseDetector,
+                                  resolutionPoseDetection=resolutionPoseDetection,
+                                  scaleModel=scaleModel,
+                                  augmenter_model=augmenter_model,
+                                  dataDir=dataDir,
+                                  runOpenSimPipeline=False)
+                    print('Finished {}'.format(trial))
+                except Exception as e:
+                    print('FAILED {} ({}): {}'.format(trial, sessionName, e))
+                    traceback.print_exc()
+                    continue
 
                 #update_progress_excel('March_2_Kinematics', '✓', sessionName)

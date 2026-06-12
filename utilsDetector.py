@@ -12,6 +12,18 @@ from decouple import config
 from utils import getOpenPoseMarkerNames, getMMposeMarkerNames, getVideoExtension
 from utilsChecker import getVideoRotation
 
+
+def _openpose_pkl_is_usable(pkl_path):
+    if not os.path.isfile(pkl_path):
+        return False
+    try:
+        with open(pkl_path, 'rb') as f:
+            frames = pickle.load(f)
+        return len(frames) > 0
+    except Exception:
+        return False
+
+
 # %%
 def runPoseDetector(CameraDirectories, trialRelativePath, pathPoseDetector,
                     trialName,
@@ -106,9 +118,11 @@ def runOpenPoseVideo(cameraDirectory,fileName,pathOpenPose, trialName,
     if not os.path.exists(pathVideoRot):
         os.system(CMD)
 
-    # Run OpenPose if this file doesn't exist in outputs
-    ppPklPath = os.path.join(pathOutputPkl, trialPrefix + '_pp.pkl')    
-    if not os.path.exists(ppPklPath):
+    # Run OpenPose if pickle is missing or empty (stale failed run).
+    ppPklPath = os.path.join(pathOutputPkl, trialPrefix + '_pp.pkl')
+    if not _openpose_pkl_is_usable(ppPklPath):
+        if os.path.exists(ppPklPath):
+            os.remove(ppPklPath)
         c_path = os.getcwd()
         command = runOpenPoseCMD(
             pathOpenPose, resolutionPoseDetection, cameraDirectory,

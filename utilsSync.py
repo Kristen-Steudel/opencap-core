@@ -16,7 +16,7 @@ from utils import (getOpenPoseMarkerNames, getOpenPoseFaceMarkers,
                    delete_multiple_element)
 from utilsChecker import (loadPklVideo, unpackKeypointList, 
                           keypointsToBoundingBox, calcReprojectionError,
-                          triangulateMultiviewVideo)
+                          triangulateMultiviewVideo, get_rotated_video_path)
 from utilsCameraPy3 import Camera
 from defaults import DEFAULT_SYNC_VER
 
@@ -69,7 +69,7 @@ def synchronizeVideos(CameraDirectories, trialRelativePath, pathPoseDetector,
         key2D, confidence = loadPklVideo(
             ppPklPath, videoFullPath, imageBasedTracker=imageBasedTracker,
             poseDetector=poseDetector,confidenceThresholdForBB=0.3)
-        thisVideo = cv2.VideoCapture(videoFullPath.replace('.mov', '_rotated.avi'))
+        thisVideo = cv2.VideoCapture(get_rotated_video_path(videoFullPath))
         frameRate = np.round(thisVideo.get(cv2.CAP_PROP_FPS))        
         if key2D.shape[1] == 0 and confidence.shape[1] == 0:
             camsToExclude.append(camName)
@@ -2006,7 +2006,7 @@ def loadPresynchronizedVideosAndFilter(CameraDirectories, trialRelativePath, pat
             poseDetector=poseDetector, confidenceThresholdForBB=0.3)
         
         # Get frame rate
-        thisVideo = cv2.VideoCapture(videoFullPath.replace('.mov', '_rotated.avi'))
+        thisVideo = cv2.VideoCapture(get_rotated_video_path(videoFullPath))
         frameRate = np.round(thisVideo.get(cv2.CAP_PROP_FPS))        
         
         if key2D.shape[1] == 0 and confidence.shape[1] == 0:
@@ -2166,7 +2166,7 @@ def loadPresynchronizedVideos(CameraDirectories, trialRelativePath, pathPoseDete
             poseDetector=poseDetector, confidenceThresholdForBB=0.3)
         
         # Get frame rate
-        thisVideo = cv2.VideoCapture(videoFullPath.replace('.mov', '_rotated.avi'))
+        thisVideo = cv2.VideoCapture(get_rotated_video_path(videoFullPath))
         frameRate = np.round(thisVideo.get(cv2.CAP_PROP_FPS))        
         
         if key2D.shape[1] == 0 and confidence.shape[1] == 0:

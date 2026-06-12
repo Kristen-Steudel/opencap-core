@@ -73,8 +73,8 @@ def main(sessionName, trialName, trial_id, cameras_to_use=['all'],
     runTriangulation = True
     # Marker augmentation.
     runMarkerAugmentation = True
-    # OpenSim pipeline.
-    runOpenSimPipeline = True    
+    # OpenSim pipeline (respect argument; extrinsics trial forces False below).
+    runOpenSimPipeline = bool(runOpenSimPipeline)
     # High-resolution for OpenPose.
     resolutionPoseDetection = resolutionPoseDetection
     # Set to False to only generate the json files (default is True).
@@ -445,7 +445,7 @@ def main(sessionName, trialName, trial_id, cameras_to_use=['all'],
 
         try:
             keypoints2D, confidence, keypointNames, frameRate, nansInOut, startEndFrames, cameras2Use = (
-                loadPresynchronizedVideosAndFilter( # End up removing this filtering
+                loadPresynchronizedVideos(
                 cameraDirectories, trialRelativePath, poseDetectorDirectory,
                 undistortPoints=True, CamParamDict=CamParamDict,
                 filtFreqs=filtFreqs, confidenceThreshold=0.4,
