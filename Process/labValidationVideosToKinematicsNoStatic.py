@@ -27,13 +27,22 @@ from utils import importMetadata
 from utilsExcel import update_progress_excel
 
 # %% User inputs
-# Enter the path to the folder where you downloaded the data. The data is on
+# Enter the path to the folder where you downloaded the data. The 
+# 
+# 
+# 
+# 
+#  is on
 # SimTK: https://simtk.org/frs/?group_id=2385 (LabValidation_withVideos).
 # In this example, our path looks like:
 #   C:/Users/opencap/Documents/LabValidation_withVideos/subject2
 #   C:/Users/opencap/Documents/LabValidation_withVideos/subject3
 #   ...
-subject_numbers = [2, 3, 4, 6, 7, 8, 9, 11, 12, 13, 16, 18, 19, 22, 23, 25, 26, 27, 28, 29, 31, 32, 33, 34, 36, 41, 46, 47, 49, 51, 52, 53, 54, 55, 56, 57, 59, 60,  62, 63, 64, 65, 66, 68]
+# February 9
+subject_numbers = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 16, 17, 18, 19, 22, 23, 25, 26, 27, 28, 29, 31, 32, 33, 34, 36, 
+38, 39, 41, 45, 46, 47, 49, 51, 52, 53, 54, 55, 56, 57, 58, 60, 62, 63, 64, 66]
+#March 16
+#subject_numbers = [2, 3, 4, 6, 7, 8, 9, 11, 12, 13, 16, 18, 19, 22, 23, 25, 26, 27, 28, 29, 31, 32, 33, 34, 36, 41, 46, 47, 49, 51, 52, 53, 54, 55, 56, 57, 59, 60,  62, 63, 64, 65, 66, 68]
 sessionNames = [f'subject{num}' for num in subject_numbers] #['subject2']#,'subject4', 'subject7', 'subject8', 'subject9', 'subject10', 'subject11', 'subject13', 'subject14']
 
 # %% Excel Progress Tracking Setup
@@ -57,7 +66,7 @@ def extract_subject_id_from_session(session_name):
         pass
     return None
 
-dataDir = os.path.normpath('G:\Shared drives\Stanford Football\March_16')
+dataDir = os.path.normpath('G:\Shared drives\Stanford Football\February_9')
 
 
 # The dataset includes 2 sessions per subject.The first session includes
