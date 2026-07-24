@@ -46,7 +46,7 @@ import utilsDataman
 
 def main(sessionName, trialName, trial_id, cameras_to_use=['all'],
          intrinsicsFinalFolder='Deployed', isDocker=False,
-         extrinsicsTrial=False, alternateExtrinsics=None, 
+         extrinsicsTrial=False, alternateExtrinsics=None,  
          calibrationOptions=None,
          markerDataFolderNameSuffix=None, imageUpsampleFactor=4,
          poseDetector='OpenPose', resolutionPoseDetection='default', 
@@ -61,7 +61,8 @@ def main(sessionName, trialName, trial_id, cameras_to_use=['all'],
          # Options: 'handPunch', 'gait', 'general', or None (auto-detect).
          forceSyncActivity=None,
          runMedianFilter=True,
-         runOpenSimPipeline=False):
+         runOpenSimPipeline=False,
+         trimTrial=True):
 
     # %% High-level settings.
     # Camera calibration.
@@ -477,6 +478,7 @@ def main(sessionName, trialName, trial_id, cameras_to_use=['all'],
             keypoints3D, confidence3D = triangulateMultiviewVideo(
                 CamParamDict, keypoints2D, ignoreMissingMarkers=False, 
                 cams2Use=cameras2Use, confidenceDict=confidence,
+                trimTrial=trimTrial,
                 spline3dZeros = True, splineMaxFrames=int(frameRate/5), 
                 nansInOut=nansInOut,CameraDirectories=cameraDirectories,
                 trialName=trialName,startEndFrames=startEndFrames,trialID=trial_id,
@@ -526,7 +528,9 @@ def main(sessionName, trialName, trial_id, cameras_to_use=['all'],
                 trc_pre.data[col_key] = _butter_lowpass_filter(
                     xyz[:, col_idx], 30.0, fs_pre)
 
-        pathFilt30HzTRC = pathOutputFiles[trialName].replace('.trc', '_median_filt30Hz.trc')
+        #pathFilt30HzTRC = pathOutputFiles[trialName].replace('.trc', '_median_filt30Hz.trc')
+        # Remove the 30 Hz name on the output path for now for processing with Nick Bianco's scripts.
+        pathFilt30HzTRC = pathOutputFiles[trialName]
         trc_pre.write(pathFilt30HzTRC)
         logging.info(f'Pre-augmentation filtered TRC saved to: {pathFilt30HzTRC}')
         pathOutputFiles[trialName] = pathFilt30HzTRC

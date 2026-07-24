@@ -28,7 +28,7 @@ FFMPEG_PATH = 'ffmpeg'
 FPS = 120
 
 # Which collection day(s) to process. Keys must match COLLECTION_DAYS below.
-ACTIVE_DAYS = ['March_16']
+ACTIVE_DAYS = ['February_2']
 
 # Optional: limit to specific subject IDs, e.g. [4] for subject4 only.
 # Set to None to process all subjects for the active day(s).
@@ -207,6 +207,7 @@ COLLECTION_DAYS = {
         'data_root': r'G:\Shared drives\Stanford Football\February_9',
         'cameras': ['Cam1b', 'Cam4b', 'Cam7b'],
         'subject_trims': {
+            2:  T(6), #  WARNING: Expected 360 but got 180!
             3:  R(1, 6),
             4:  R(1, 6),
             5:  R(1, 6),
@@ -257,24 +258,54 @@ COLLECTION_DAYS = {
         'subject_trims': {
             2:  T(6),
             3:  T(6),
+            4:  T(6),
+            5:  T(6),
+            7:  T(6),
+            8:  T(6),
+            9:  T(7),
+            10:  T(6),
+            11:  T(6),
             12: T(7),
             13: T(7),
+            14: T(7),
+            16: T(6),
             17: R(3, 8),
+            18: T(6),
             19: R(2, 7),
             22: T(7),
+            23: T(6),
             25: R(1, 7),
             26: T(8),
+            27: T(6),
+            28: T(6),
             29: R(2, 8),
+            31: T(6),
+            32: T(6),
+            33: R(3, 8),
+            34: T(6),
             36: R(1, 7),
             38: R(4, 10),
+            39: T(6.5),
             41: T(6),
             44: R(1, 9),
+            45: R(1, 6),
+            46: R(1, 6),
             47: R(1, 8),
             48: T(7),
+            49: R(1, 6),
+            51: R(1, 6),
             52: R(5, 11),
+            53: R(2, 7),
+            54: R(1, 6),
+            55: R(2, 6), 
+            56: R(2, 7), 
             57: T(6.5),          # notes say 6.5 or 7 s — using 6.5
             58: T(7.5),
             60: T(7),
+            62: R(2, 6),
+            63: R(2, 6), 
+            64: R(3, 7),
+            66: R(1, 5),
             69: R(1, 8),
             # 14: ran through, no decel — no trim range given, skipped
             # 33: incorrect motion — skipped

@@ -44,7 +44,7 @@ def main(sessionName, trialName, trial_id, cameras_to_use=['all'],
          filter_frequency='default', overwriteFilterFrequency=False,
          scaling_setup='upright_standing_pose', overwriteScalingSetup=False,
          overwriteCamerasToUse=False, syncVer=None,
-         runSynchronization=True, runMedianFilter=True,):
+         runSynchronization=False, runMedianFilter=False):
 
     # %% High-level settings.
     # Camera calibration.

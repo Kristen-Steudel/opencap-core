@@ -22,7 +22,7 @@ repoDir = os.path.abspath(
     os.path.join(os.path.dirname(os.path.abspath(__file__)),'../'))
 sys.path.append(repoDir)
 
-from main_median import main
+from main import main
 from utils import importMetadata
 from utilsExcel import update_progress_excel
 
@@ -38,11 +38,27 @@ from utilsExcel import update_progress_excel
 #   C:/Users/opencap/Documents/LabValidation_withVideos/subject2
 #   C:/Users/opencap/Documents/LabValidation_withVideos/subject3
 #   ...
+
+# February 2
+#subject_numbers = [2, 3, 4, 5, 7, 8, 9, 10, 11, 12, 13, 14, 16, 17, 18, 19, 22, 23, 25, 26, 27, 28, 29, 31, 32, 33, 34, 36, 38, 39, 41, 44, 45, 46, 47, 48, 49, 51, 52, 53, 54, 55, 56, 57, 58, 60, 62, 63, 64, 66,69]
+
 # February 9
-subject_numbers = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 16, 17, 18, 19, 22, 23, 25, 26, 27, 28, 29, 31, 32, 33, 34, 36, 
-38, 39, 41, 45, 46, 47, 49, 51, 52, 53, 54, 55, 56, 57, 58, 60, 62, 63, 64, 66]
+#subject_numbers = [6] #, 7, 8, 9, 10, 11, 12, 13, 14, 16, 17, 18, 19, 22, 23, 25, 26, 27, 28, 29, 31, 32, 33, 34, 36, 38, 39, 41, 45, 46, 47, 49, 51, 52, 53, 54, 55, 56, 57, 58, 60, 62, 63, 64, 66]
+# Full set of numbers Feb 9
+#subject_numbers = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 16, 17, 18, 19, 22, 23, 25, 26, 27, 28, 29, 31, 32, 33, 34, 36, 
+#38, 39, 41, 45, 46, 47, 49, 51, 52, 53, 54, 55, 56, 57, 58, 60, 62, 63, 64, 66]
+
+# February 23
+#subject_numbers = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 16, 19, 22, 25, 26, 27, 28, 29, 
+#31, 32, 33, 34, 36, 41, 44, 45, 46, 47, 49, 51, 52, 54, 55, 56, 57, 58, 59, 60, 62, 63, 66, 68]
+
+# March 2
+subject_numbers = [3, 4]
+#subject_numbers = [5, 7]#[2 ,3, 4, 5, 7, 8, 9, 11, 12, 13, 16, 19, 22, 25, 26, 27, 28, 29, 31, 32, 33, 34, 35, 36, 41, 44, 45, 46, 47, 49, 51, 52, 53, 54, 55, 56, 57, 59, 60, 62, 63, 64, 65, 66, 68]
+
 #March 16
 #subject_numbers = [2, 3, 4, 6, 7, 8, 9, 11, 12, 13, 16, 18, 19, 22, 23, 25, 26, 27, 28, 29, 31, 32, 33, 34, 36, 41, 46, 47, 49, 51, 52, 53, 54, 55, 56, 57, 59, 60,  62, 63, 64, 65, 66, 68]
+
 sessionNames = [f'subject{num}' for num in subject_numbers] #['subject2']#,'subject4', 'subject7', 'subject8', 'subject9', 'subject10', 'subject11', 'subject13', 'subject14']
 
 # %% Excel Progress Tracking Setup
@@ -66,7 +82,7 @@ def extract_subject_id_from_session(session_name):
         pass
     return None
 
-dataDir = os.path.normpath('G:\Shared drives\Stanford Football\February_9')
+dataDir = os.path.normpath('G:\Shared drives\Stanford Football\March_16')
 
 
 # The dataset includes 2 sessions per subject.The first session includes
@@ -90,6 +106,9 @@ resolutionPoseDetection = 'default'#'default' #'1x1008_4scales'
 # used for generating the paper results, select v0.1. To use the latest model
 # (now in production), select v0.2.
 augmenter_model = 'v0.3'
+
+# Keep all video frames in marker TRCs (OpenCap default trims to valid 3D window).
+trimTrial = False
 
 # %% Data re-organization
 # To reprocess the data, we need to re-organize the data so that the folder
@@ -151,7 +170,7 @@ cam2sUse = {'5-cameras': ['Cam0', 'Cam1', 'Cam2', 'Cam3', 'Cam4'],
 
 def is_trimmed_motion_trial(trial_name):
     """Canonical trimmed trials from BatchTrimVideos end with '_trimmed'."""
-    return trial_name.lower().endswith('_trimmed')
+    return trial_name.lower().endswith('_trimmed') or 'trimmed' in trial_name.lower()
 
 
 def clear_stale_openpose_outputs(session_dir, trial_name, cameras,
@@ -184,11 +203,12 @@ def process_trial(trial_name=None, session_name=None, isDocker=False,
                   cam2Use=['all_available'], #changed from 'all'
                   intrinsicsFinalFolder='Deployed', extrinsicsTrial=False,
                   alternateExtrinsics=None, markerDataFolderNameSuffix=None,
+                  #alternateExtrinsics=['Cam1b', 'Cam4b', 'Cam7b'], markerDataFolderNameSuffix=None, #alternateExtrinsics was None
                   imageUpsampleFactor=4, poseDetector='OpenPose',
                   resolutionPoseDetection='default', scaleModel=False, #changed resolution from default
                   bbox_thr=0.8, augmenter_model='v0.2', benchmark=False,
                   calibrationOptions=None, offset=True, dataDir=None,
-                  runOpenSimPipeline=False):
+                  runOpenSimPipeline=False, trimTrial=True):
 
     # Run main processing pipeline.
     main(session_name, trial_name, trial_name, cam2Use, intrinsicsFinalFolder,
@@ -197,8 +217,7 @@ def process_trial(trial_name=None, session_name=None, isDocker=False,
           resolutionPoseDetection=resolutionPoseDetection,
           scaleModel=scaleModel, bbox_thr=bbox_thr,
           augmenter_model=augmenter_model, benchmark=benchmark, offset=offset,
-          dataDir=dataDir, overwriteCamerasToUse=True,
-          runOpenSimPipeline=runOpenSimPipeline)
+          dataDir=dataDir, overwriteCamerasToUse=True)
 
     return
 
@@ -213,8 +232,9 @@ for count, sessionName in enumerate(sessionNames):
         t for t in os.listdir(pathCam0)
         if os.path.isdir(os.path.join(pathCam0, t))])
     extrinsics_trials = [t for t in trials_tmp if 'extrinsics' in t.lower()]
-    trimmed_trials = [t for t in trials_tmp if is_trimmed_motion_trial(t)]
-    trials = extrinsics_trials + trimmed_trials
+    trimmed_trials = [t for t in trials_tmp if is_trimmed_motion_trial(t)] # I want to keep trimmed trials separate
+    trials_not_trimmed = [t for t in trials_tmp if not is_trimmed_motion_trial(t)] # I only want to process the full trials
+    trials = extrinsics_trials + trials_not_trimmed
     
     for poseDetector in poseDetectors:
         for cameraSetup in cameraSetups:
@@ -270,7 +290,8 @@ for count, sessionName in enumerate(sessionNames):
                                   scaleModel=scaleModel,
                                   augmenter_model=augmenter_model,
                                   dataDir=dataDir,
-                                  runOpenSimPipeline=False)
+                                  #runOpenSimPipeline=True,
+                                  trimTrial=trimTrial)
                     print('Finished {}'.format(trial))
                 except Exception as e:
                     print('FAILED {} ({}): {}'.format(trial, sessionName, e))
