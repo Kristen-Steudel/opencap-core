@@ -28,7 +28,7 @@ FFMPEG_PATH = 'ffmpeg'
 FPS = 120
 
 # Which collection day(s) to process. Keys must match COLLECTION_DAYS below.
-ACTIVE_DAYS = ['February_2']
+ACTIVE_DAYS = ['March_16']
 
 # Optional: limit to specific subject IDs, e.g. [4] for subject4 only.
 # Set to None to process all subjects for the active day(s).
@@ -47,7 +47,7 @@ def T(end_s):
 
 def R(start_s, end_s):
     """Trim from start_s to end_s seconds."""
-    return {'start_frame': f(start_s + 3), 'end_frame': f(end_s)}
+    return {'start_frame': f(start_s), 'end_frame': f(end_s)}
 
 
 # ---------------------------------------------------------------------------
@@ -58,47 +58,48 @@ COLLECTION_DAYS = {
         'data_root': r'G:\Shared drives\Stanford Football\March_16',
         'cameras': ['Cam1b', 'Cam4b', 'Cam7b'],
         'subject_trims': {
-            2: T(5.5),
-            3: T(5.5),
-            4: T(5.5),
-            6: T(5.5),
-            7: T(5.5),
-            8: T(5.5),
-            9: T(5.5),
-            11: T(5.5),
-            12: R(4, 9),          # trim false start (seconds 4–9)
-            16: R(3, 6),          # trim start (seconds 3–6)
-            22: T(5),             # trim to end at 5 s
-            23: T(5.5),
-            25: T(5.5),
-            26: T(6),
-            27: R(1, 5.5),
-            28: R(1, 5.5),
-            29: T(4.5),
-            31: R(1, 5),
-            32: T(5),
-            33: R(1, 5),
-            34: R(2, 6),
-            36: T(5),
-            41: T(5),
-            46: R(2, 5.5),
-            47: R(1, 5),
-            49: R(2, 6.5),
-            51: R(1, 6),
-            52: R(4, 7.5),
-            53: T(5),
-            54: R(1, 5),
-            55: R(1, 5),
-            56: R(1, 5),
-            57: R(2, 6),
-            59: T(5),
-            60: R(1.5, 5),
-            62: T(4.5),
-            63: T(4.5),
-            64: T(4.5),
-            65: R(0.5, 5.5),
-            66: R(1, 5.5),
-            68: T(4.5),
+            13: R(4.571, 5.058)
+            # 2: T(5.5),
+            # 3: T(5.5),
+            # 4: T(5.5),
+            # 6: T(5.5),
+            # 7: T(5.5),
+            # 8: T(5.5),
+            # 9: T(5.5),
+            # 11: T(5.5),
+            # 12: R(4, 9),          # trim false start (seconds 4–9)
+            # 16: R(3, 6),          # trim start (seconds 3–6)
+            # 22: T(5),             # trim to end at 5 s
+            # 23: T(5.5),
+            # 25: T(5.5),
+            # 26: T(6),
+            # 27: R(1, 5.5),
+            # 28: R(1, 5.5),
+            # 29: T(4.5),
+            # 31: R(1, 5),
+            # 32: T(5),
+            # 33: R(1, 5),
+            # 34: R(2, 6),
+            # 36: T(5),
+            # 41: T(5),
+            # 46: R(2, 5.5),
+            # 47: R(1, 5),
+            # 49: R(2, 6.5),
+            # 51: R(1, 6),
+            # 52: R(4, 7.5),
+            # 53: T(5),
+            # 54: R(1, 5),
+            # 55: R(1, 5),
+            # 56: R(1, 5),
+            # 57: R(2, 6),
+            # 59: T(5),
+            # 60: R(1.5, 5),
+            # 62: T(4.5),
+            # 63: T(4.5),
+            # 64: T(4.5),
+            # 65: R(0.5, 5.5),
+            # 66: R(1, 5.5),
+            # 68: T(4.5),
             # 18: "can trim end" — no specific range, skipped
         },
     },

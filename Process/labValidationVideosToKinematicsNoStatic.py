@@ -53,7 +53,7 @@ from utilsExcel import update_progress_excel
 #31, 32, 33, 34, 36, 41, 44, 45, 46, 47, 49, 51, 52, 54, 55, 56, 57, 58, 59, 60, 62, 63, 66, 68]
 
 # March 2
-subject_numbers = [3, 4]
+subject_numbers = [13]
 #subject_numbers = [5, 7]#[2 ,3, 4, 5, 7, 8, 9, 11, 12, 13, 16, 19, 22, 25, 26, 27, 28, 29, 31, 32, 33, 34, 35, 36, 41, 44, 45, 46, 47, 49, 51, 52, 53, 54, 55, 56, 57, 59, 60, 62, 63, 64, 65, 66, 68]
 
 #March 16
@@ -100,7 +100,7 @@ cameraSetups = ['3-cameras']
 # Select the resolution at which you would like to use OpenPose. More details
 # about the options in Examples/reprocessSessions. In the paper, we compared 
 # 'default' and '1x1008_4scales'.
-resolutionPoseDetection = 'default'#'default' #'1x1008_4scales'   
+resolutionPoseDetection = '1x1008_4scales'#'default' #'1x1008_4scales'   
 
 # Since the prepint release, we updated a new augmenter model. To use the model
 # used for generating the paper results, select v0.1. To use the latest model
@@ -234,7 +234,8 @@ for count, sessionName in enumerate(sessionNames):
     extrinsics_trials = [t for t in trials_tmp if 'extrinsics' in t.lower()]
     trimmed_trials = [t for t in trials_tmp if is_trimmed_motion_trial(t)] # I want to keep trimmed trials separate
     trials_not_trimmed = [t for t in trials_tmp if not is_trimmed_motion_trial(t)] # I only want to process the full trials
-    trials = extrinsics_trials + trials_not_trimmed
+    #trials = extrinsics_trials + trials_not_trimmed # Run this line if you want to process the full trial
+    trials = extrinsics_trials +trimmed_trials # Run this line if you want to process the trimmed trial
     
     for poseDetector in poseDetectors:
         for cameraSetup in cameraSetups:
