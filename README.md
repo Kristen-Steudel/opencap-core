@@ -15,3 +15,9 @@ Archived code base accompanying the paper: [https://doi.org/10.5281/zenodo.74199
 ### Hardware and OS requirements:
 This is the one OpenCap Repository that requires a NVIDIA GPU to run.
 These instructions are for Windows 10. The pipeline also runs on Ubuntu. Minimum GPU requirements: CUDA-enabled GPU with at least 4GB memory. Not all of the OpenPose settings will run on small GPUs. To run the OpenPose settings we use in the cloud pipeline, you need a GPU with 8GB of memory. To run the high resolution settings, you need a GPU with at least 24GB memory. For local postprocessing, we use NVIDIA GeForce RTX 3090s (24GB).
+
+## Branches
+cleaned-scripts has the scripts used to run plain processing - run Process/labValidationVideosToKinematicsNoStatic.py to process a trial by changing the subjectID numbers and the date
+
+hampel - has scripts for processing with hampel filtering on the preaugmented marker data to remove outlier markers.
+
