@@ -5,14 +5,10 @@
     reconstructs the 3D marker positions, augments the marker set,
     and runs the OpenSim pipeline.
 
-    This variant (main_median.py) adds two pre-augmentation filtering steps
-    onto the main.py pipeline (controlled by runMedianFilter=True):
-
-      1. Median filter (window=7) on the raw triangulated TRC.
-      2. 30 Hz Butterworth low-pass filter on the median-filtered TRC.
-
-    The doubly-filtered TRC is then fed into the LSTM augmenter. No filters
-    are applied after augmentation. Everything else is identical to main.py.
+    This variant (main_median.py) adds a pre-augmentation Hampel filter
+    (controlled by runMedianFilter=True) on the raw triangulated TRC before
+    the LSTM augmenter. No low-pass filter is applied after Hampel. Optional
+    OpenSim IK runs on the post-augmentation TRC when runOpenSimPipeline=True.
 """
 
 import os 
@@ -20,7 +16,6 @@ import glob
 import numpy as np
 import yaml
 import traceback
-import scipy.signal
 
 import logging
 logging.basicConfig(level=logging.INFO)
@@ -41,7 +36,6 @@ from utilsAugmenter import augmentTRC
 from utilsOpenSim import runScaleTool, getScaleTimeRange, runIKTool, generateVisualizerJson
 from defaults import DEFAULT_SYNC_VER
 from utilsMedian import median_filter_trc_file
-import utilsDataman
 
 
 def main(sessionName, trialName, trial_id, cameras_to_use=['all'],
@@ -500,40 +494,16 @@ def main(sessionName, trialName, trial_id, cameras_to_use=['all'],
                                 keypointNames, frameRate=frameRate, 
                                 rotationAngles=rotationAngles)
 
-    # %% Pre-augmentation filtering (median then 30 Hz Butterworth).
-    # Step 1: window-7 moving-median filter suppresses spike artifacts from
-    #         occasional pose estimation errors.
-    # Step 2: 30 Hz 4th-order Butterworth low-pass filter smooths the
-    #         median-filtered signal before it reaches the augmenter.
-    # Both steps are gated on runMedianFilter. pathOutputFiles is updated so
-    # augmentation and all downstream steps automatically use the cleaned data.
+    # %% Pre-augmentation Hampel filtering.
+    # Window-7 Hampel filter suppresses spike artifacts from occasional pose
+    # estimation errors before augmentation. pathOutputFiles is updated so
+    # augmentation and IK use the cleaned data when runMedianFilter is True.
     if runMedianFilter and runTriangulation and os.path.exists(pathOutputFiles[trialName]):
-        logging.info('Applying median filter (window=7) to pre-augmentation TRC')
-        pathMedianFilteredTRC = pathOutputFiles[trialName].replace('.trc', '_median.trc')
-        median_filter_trc_file(pathOutputFiles[trialName], pathMedianFilteredTRC, window=7)
-
-        logging.info('Applying 30 Hz Butterworth low-pass filter to median-filtered TRC')
-        trc_pre = utilsDataman.TRCFile(pathMedianFilteredTRC)
-        fs_pre = trc_pre.data_rate
-
-        def _butter_lowpass_filter(data, cutoff, fs, order=4):
-            nyq = 0.5 * fs
-            b, a = scipy.signal.butter(order, cutoff / nyq, btype='low', analog=False)
-            return scipy.signal.filtfilt(b, a, data)
-
-        for marker in trc_pre.marker_names:
-            xyz = trc_pre.marker(marker)
-            for col_idx, col_key in enumerate(
-                    [marker + '_tx', marker + '_ty', marker + '_tz']):
-                trc_pre.data[col_key] = _butter_lowpass_filter(
-                    xyz[:, col_idx], 30.0, fs_pre)
-
-        #pathFilt30HzTRC = pathOutputFiles[trialName].replace('.trc', '_median_filt30Hz.trc')
-        # Remove the 30 Hz name on the output path for now for processing with Nick Bianco's scripts.
-        pathFilt30HzTRC = pathOutputFiles[trialName]
-        trc_pre.write(pathFilt30HzTRC)
-        logging.info(f'Pre-augmentation filtered TRC saved to: {pathFilt30HzTRC}')
-        pathOutputFiles[trialName] = pathFilt30HzTRC
+        logging.info('Applying Hampel filter (window=7) to pre-augmentation TRC')
+        pathHampelFilteredTRC = pathOutputFiles[trialName].replace('.trc', '_hampel.trc')
+        median_filter_trc_file(pathOutputFiles[trialName], pathHampelFilteredTRC, window=7)
+        logging.info(f'Pre-augmentation Hampel TRC saved to: {pathHampelFilteredTRC}')
+        pathOutputFiles[trialName] = pathHampelFilteredTRC
 
     # %% Augmentation.
     
@@ -541,18 +511,23 @@ def main(sessionName, trialName, trial_id, cameras_to_use=['all'],
     augmenterModelName = (
         sessionMetadata['markerAugmentationSettings']['markerAugmenterModel'])
     
+    # Suffix distinguishes augmented outputs when pre-aug Hampel filtering ran.
+    hampel_suffix = '_hampel' if runMedianFilter else ''
+    
     # Set output file name.
     pathAugmentedOutputFiles = {}
     if genericFolderNames:
         pathAugmentedOutputFiles[trialName] = os.path.join(
-                postAugmentationDir, trial_id + ".trc")
+                postAugmentationDir, trial_id + hampel_suffix + ".trc")
     else:
         if benchmark:
             pathAugmentedOutputFiles[trialName] = os.path.join(
-                    postAugmentationDir, trialName + "_" + augmenterModelName +".trc")
+                    postAugmentationDir,
+                    trialName + hampel_suffix + "_" + augmenterModelName + ".trc")
         else:
             pathAugmentedOutputFiles[trialName] = os.path.join(
-                    postAugmentationDir, trial_id + "_" + augmenterModelName +".trc")
+                    postAugmentationDir,
+                    trial_id + hampel_suffix + "_" + augmenterModelName + ".trc")
     
     if runMarkerAugmentation:
         os.makedirs(postAugmentationDir, exist_ok=True)    
@@ -670,12 +645,11 @@ def main(sessionName, trialName, trial_id, cameras_to_use=['all'],
                 genericSetupFile4IKName = 'Setup_IK{}.xml'.format(suffix_model)
                 pathGenericSetupFile4IK = os.path.join(
                     openSimPipelineDir, 'IK', genericSetupFile4IKName)
-                # IK always uses the plain augmented TRC. Pre-augmentation
-                # filtering (median + 30 Hz Butterworth) already cleaned the
-                # data that the augmenter saw, so no additional post-aug filter.
+                # IK always uses the post-augmentation TRC (Hampel-suffixed when enabled).
                 pathTRCFile4IK = pathAugmentedOutputFiles[trialName]
-                IKFileName = 'not_specified'
-                # Run IK tool. 
+                IKFileName = os.path.splitext(
+                    os.path.basename(pathTRCFile4IK))[0]
+                # Run IK tool.
                 logging.info('Running Inverse Kinematics')
                 try:
                     pathOutputIK, pathModelIK = runIKTool(

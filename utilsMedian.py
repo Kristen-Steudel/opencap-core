@@ -55,31 +55,33 @@ import numpy as np
 ##################################################################################################
 # Use this function below to avoid the use of MAD
 
-def median_window_filter(x, window):
+def median_window_filter(x, window, n_sigma=2):
     """
-    Moving median filter that can take np.nan as entries.
-    Note that the filter is non-causal, output of sample ii is the median
-    of samples of the corresponding window centered around ii.
-    
-    Inputs:
-        x       ->  signal to filtered,
-        window  ->  number of samples to use for median estimation.
-
-    Output:
-        y       <-  median filtered signal
+    Sliding Hampel filter: replace a sample only if it is an outlier in its window.
+    Non-outliers are left unchanged. Handles NaNs like the original.
     """
-
-    # To take care of an even window size if you accidentally put one in. But choosing an odd window size is better.
-    if window % 2:
-        window = window - 1 # Making the window even for equal points on left and right 
-    win2 = int(window / 2) # Now win2 is always an integer
+    if window % 2 == 0:
+        window += 1
+    half = window // 2
+    x = np.asarray(x, dtype=float)
+    y = x.copy()
     n = len(x)
-    y = np.array(x, dtype=float)
-    
-    for ii in range(win2, n - win2):
-        idx = np.arange(ii - win2, ii + win2, dtype=int)
-        y[ii] = np.nanmedian(x[idx])
-    
+
+    for i in range(n):
+        chunk = x[max(0, i - half):min(n, i + half + 1)]
+        valid = chunk[np.isfinite(chunk)]
+        if valid.size == 0:
+            continue
+
+        med = np.median(valid)
+        scale = np.std(valid, ddof=1) if valid.size > 1 else 0.0
+
+        if not np.isfinite(y[i]):
+            y[i] = med
+        elif scale > 0 and abs(y[i] - med) > n_sigma * scale:
+            y[i] = med
+        # else: keep original y[i]
+
     return y
 ##################################################################################################
 
@@ -196,9 +198,9 @@ def median_filter_trc_file(input_trc_path, output_trc_path, window=7,
         axes[i].set_xlabel('Frame')
         axes[i].legend(loc='upper left')
         axes[i].grid(True, alpha=0.3)
-        axes[0].set_title(f'Median Filter (Window={window}) on Marker: {sample_marker}')
+        axes[0].set_title(f'Hampel Filter (Window={window}) on Marker: {sample_marker}')
     plt.tight_layout()
-    output_figure_path = output_trc_path.replace('.trc', '_median_filter_effect.png')
+    output_figure_path = output_trc_path.replace('.trc', '_hampel_filter_effect.png')
     fig.savefig(output_figure_path, dpi=300)
     if show_plot:
         plt.show()

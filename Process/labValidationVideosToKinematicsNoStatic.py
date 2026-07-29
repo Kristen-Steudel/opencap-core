@@ -22,7 +22,7 @@ repoDir = os.path.abspath(
     os.path.join(os.path.dirname(os.path.abspath(__file__)),'../'))
 sys.path.append(repoDir)
 
-from main import main
+from main_median import main
 from utils import importMetadata
 from utilsExcel import update_progress_excel
 
@@ -91,7 +91,7 @@ dataDir = os.path.normpath('G:\Shared drives\Stanford Football\March_16')
 # <subject_name>_Session1.
 
 # We only support OpenPose on Windows.
-poseDetectors = ['hrnet_v0.2']
+poseDetectors = ['OpenPose']
 
 # Select the camera configuration you would like to use.
 # cameraSetups = ['2-cameras', '3-cameras', '5-cameras']
@@ -109,6 +109,10 @@ augmenter_model = 'v0.3'
 
 # Keep all video frames in marker TRCs (OpenCap default trims to valid 3D window).
 trimTrial = False
+
+# Hampel pre-augmentation filter; post-aug IK on augmented TRC.
+runMedianFilter = True
+runOpenSimPipeline = True
 
 # %% Data re-organization
 # To reprocess the data, we need to re-organize the data so that the folder
@@ -208,7 +212,8 @@ def process_trial(trial_name=None, session_name=None, isDocker=False,
                   resolutionPoseDetection='default', scaleModel=False, #changed resolution from default
                   bbox_thr=0.8, augmenter_model='v0.2', benchmark=False,
                   calibrationOptions=None, offset=True, dataDir=None,
-                  runOpenSimPipeline=False, trimTrial=True):
+                  runOpenSimPipeline=False, trimTrial=True,
+                  runMedianFilter=True):
 
     # Run main processing pipeline.
     main(session_name, trial_name, trial_name, cam2Use, intrinsicsFinalFolder,
@@ -217,7 +222,9 @@ def process_trial(trial_name=None, session_name=None, isDocker=False,
           resolutionPoseDetection=resolutionPoseDetection,
           scaleModel=scaleModel, bbox_thr=bbox_thr,
           augmenter_model=augmenter_model, benchmark=benchmark, offset=offset,
-          dataDir=dataDir, overwriteCamerasToUse=True)
+          dataDir=dataDir, overwriteCamerasToUse=True,
+          runOpenSimPipeline=runOpenSimPipeline, trimTrial=trimTrial,
+          runMedianFilter=runMedianFilter)
 
     return
 
@@ -291,8 +298,9 @@ for count, sessionName in enumerate(sessionNames):
                                   scaleModel=scaleModel,
                                   augmenter_model=augmenter_model,
                                   dataDir=dataDir,
-                                  #runOpenSimPipeline=True,
-                                  trimTrial=trimTrial)
+                                  runOpenSimPipeline=runOpenSimPipeline,
+                                  trimTrial=trimTrial,
+                                  runMedianFilter=runMedianFilter)
                     print('Finished {}'.format(trial))
                 except Exception as e:
                     print('FAILED {} ({}): {}'.format(trial, sessionName, e))
