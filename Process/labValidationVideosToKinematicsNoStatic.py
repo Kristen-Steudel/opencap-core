@@ -91,7 +91,7 @@ dataDir = os.path.normpath('G:\Shared drives\Stanford Football\March_16')
 # <subject_name>_Session1.
 
 # We only support OpenPose on Windows.
-poseDetectors = ['OpenPose']
+poseDetectors = ['hrnet_v0.2']
 
 # Select the camera configuration you would like to use.
 # cameraSetups = ['2-cameras', '3-cameras', '5-cameras']
